@@ -1,0 +1,74 @@
+{
+  "results": [
+    {
+      "combo": {
+        "epochs": 3,
+        "pairs": 80,
+        "lr": 0.02
+      },
+      "passed": 5,
+      "total": 100,
+      "pass_rate": 0.05
+    },
+    {
+      "combo": {
+        "epochs": 3,
+        "pairs": 110,
+        "lr": 0.03
+      },
+      "passed": 8,
+      "total": 100,
+      "pass_rate": 0.08
+    },
+    {
+      "combo": {
+        "epochs": 4,
+        "pairs": 100,
+        "lr": 0.03
+      },
+      "passed": 9,
+      "total": 100,
+      "pass_rate": 0.09
+    },
+    {
+      "combo": {
+        "epochs": 5,
+        "pairs": 110,
+        "lr": 0.03
+      },
+      "passed": 5,
+      "total": 100,
+      "pass_rate": 0.05
+    },
+    {
+      "combo": {
+        "epochs": 6,
+        "pairs": 80,
+        "lr": 0.02
+      },
+      "passed": 7,
+      "total": 100,
+      "pass_rate": 0.07
+    },
+    {
+      "combo": {
+        "epochs": 6,
+        "pairs": 140,
+        "lr": 0.04
+      },
+      "passed": 11,
+      "total": 100,
+      "pass_rate": 0.11
+    }
+  ],
+  "best": {
+    "combo": {
+      "epochs": 6,
+      "pairs": 140,
+      "lr": 0.04
+    },
+    "passed": 11,
+    "total": 100,
+    "pass_rate": 0.11
+  }
+}
