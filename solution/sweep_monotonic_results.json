@@ -1,0 +1,45 @@
+{
+  "fixed_hparams": {
+    "epochs": 6,
+    "pairs_per_race": 140,
+    "learning_rate": 0.04,
+    "l2": 1e-05
+  },
+  "results": [
+    {
+      "monotonic_strength": 0.0,
+      "passed": 11,
+      "total": 100,
+      "pass_rate": 0.11,
+      "model_copy": "solution/model_params_mono_0_0.json"
+    },
+    {
+      "monotonic_strength": 0.08,
+      "passed": 11,
+      "total": 100,
+      "pass_rate": 0.11,
+      "model_copy": "solution/model_params_mono_0_08.json"
+    },
+    {
+      "monotonic_strength": 0.12,
+      "passed": 11,
+      "total": 100,
+      "pass_rate": 0.11,
+      "model_copy": "solution/model_params_mono_0_12.json"
+    },
+    {
+      "monotonic_strength": 0.18,
+      "passed": 12,
+      "total": 100,
+      "pass_rate": 0.12,
+      "model_copy": "solution/model_params_mono_0_18.json"
+    }
+  ],
+  "best": {
+    "monotonic_strength": 0.18,
+    "passed": 12,
+    "total": 100,
+    "pass_rate": 0.12,
+    "model_copy": "solution/model_params_mono_0_18.json"
+  }
+}

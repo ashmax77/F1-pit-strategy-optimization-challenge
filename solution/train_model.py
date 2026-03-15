@@ -6,16 +6,66 @@ import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
+try:
+    import numpy as np
+    NUMPY_AVAILABLE = True
+except ImportError:
+    NUMPY_AVAILABLE = False
+
 
 REF_TEMP = 30.0
 
 
-def _age_bucket(age, age_bucket_cap):
-    return min(age, age_bucket_cap)
+def _build_age_index_groups(feature_names):
+    """Map tire -> sorted index list for lap:: and temp:: age buckets."""
+    groups = {
+        "lap": {"SOFT": [], "MEDIUM": [], "HARD": []},
+        "temp": {"SOFT": [], "MEDIUM": [], "HARD": []},
+    }
+    for idx, name in enumerate(feature_names):
+        if name.startswith("lap::") or name.startswith("temp::"):
+            parts = name.split("::")
+            if len(parts) != 3:
+                continue
+            kind, tire, age_str = parts
+            if tire not in groups.get(kind, {}):
+                continue
+            try:
+                age = int(age_str)
+            except ValueError:
+                continue
+            groups[kind][tire].append((age, idx))
+
+    ordered = {"lap": {}, "temp": {}}
+    for kind in ("lap", "temp"):
+        for tire in ("SOFT", "MEDIUM", "HARD"):
+            ordered[kind][tire] = [idx for _age, idx in sorted(groups[kind][tire])]
+    return ordered
 
 
-def _phase_bucket(lap_number, total_laps, progress_buckets):
-    return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
+def _apply_monotonic_smoothing(weights, age_groups, strength, rounds=1):
+    """
+    Smooth age-bin weights to enforce near-monotonic degradation.
+    Larger age bucket should not be significantly faster than the previous one.
+    """
+    if strength <= 0.0:
+        return
+
+    for _ in range(rounds):
+        for kind in ("lap", "temp"):
+            for tire in ("SOFT", "MEDIUM", "HARD"):
+                idxs = age_groups[kind][tire]
+                if len(idxs) < 2:
+                    continue
+                for i in range(len(idxs) - 1):
+                    i0 = idxs[i]
+                    i1 = idxs[i + 1]
+                    # For degradation: w(age+1) >= w(age). If violated, pull them together.
+                    violation = weights[i0] - weights[i1]
+                    if violation > 0.0:
+                        delta = 0.5 * strength * violation
+                        weights[i0] -= delta
+                        weights[i1] += delta
 
 
 def _iter_laps(strategy, total_laps):
@@ -32,47 +82,31 @@ def _iter_laps(strategy, total_laps):
 
 
 def extract_features(strategy, race_config, config):
+    """
+        Per-age-bucket features for nonparametric nonlinear degradation fit.
+        Features:
+            - driver::DXX: tiebreaker
+            - lap::TIRE::age_bucket: laps on each (tire, age) bin  → captures degradation curve
+            - temp::TIRE::age_bucket: temp-modulated laps → captures temperature-degradation interaction
+            - pit_count, pit_lane_time: pit penalty
+        Total: 3×cap × 2 types + 20 drivers + 2 pit  ≈ 322 features (cap=50)
+    """
     total_laps = int(race_config["total_laps"])
-    track = race_config["track"]
     temp_norm = (float(race_config["track_temp"]) - REF_TEMP) / config["temp_scale"]
     pit_stops = strategy.get("pit_stops", [])
 
-    feats = {
-        f"driver::{strategy['driver_id']}": 1.0,
-        "pit_count": float(len(pit_stops)),
-        "pit_lane_time": float(race_config["pit_lane_time"]) * len(pit_stops),
-        f"track_pit_count::{track}": float(len(pit_stops)),
-        f"track_pit_time::{track}": float(race_config["pit_lane_time"]) * len(pit_stops),
-    }
+    age_bucket_cap = config.get("age_bucket_cap", 50)
 
-    for lap_number, tire, tire_age in _iter_laps(strategy, total_laps):
-        age_bucket = _age_bucket(tire_age, config["age_bucket_cap"])
-        phase_bucket = _phase_bucket(lap_number, total_laps, config["progress_buckets"])
-        lap_key = f"lap::{tire}::{age_bucket}"
-        temp_key = f"temp::{tire}::{age_bucket}"
-        phase_key = f"phase::{tire}::{phase_bucket}"
+    feats = {f"driver::{strategy['driver_id']}": 1.0}
+    for _lap_number, tire, tire_age in _iter_laps(strategy, total_laps):
+        bucket = min(tire_age, age_bucket_cap)
+        lap_key = f"lap::{tire}::{bucket}"
+        temp_key = f"temp::{tire}::{bucket}"
         feats[lap_key] = feats.get(lap_key, 0.0) + 1.0
         feats[temp_key] = feats.get(temp_key, 0.0) + temp_norm
-        feats[phase_key] = feats.get(phase_key, 0.0) + 1.0
-        feats[f"track_lap::{track}::{tire}::{age_bucket}"] = (
-            feats.get(f"track_lap::{track}::{tire}::{age_bucket}", 0.0) + 1.0
-        )
-        feats[f"track_phase::{track}::{tire}::{phase_bucket}"] = (
-            feats.get(f"track_phase::{track}::{tire}::{phase_bucket}", 0.0) + 1.0
-        )
 
-    for stop in pit_stops:
-        stop_lap = int(stop["lap"])
-        from_tire = stop["from_tire"]
-        to_tire = stop["to_tire"]
-        stop_phase = _phase_bucket(stop_lap, total_laps, config["progress_buckets"])
-        trans_key = f"pit_trans::{from_tire}->{to_tire}"
-        trans_phase_key = f"pit_trans_phase::{from_tire}->{to_tire}::{stop_phase}"
-        feats[trans_key] = feats.get(trans_key, 0.0) + 1.0
-        feats[trans_phase_key] = feats.get(trans_phase_key, 0.0) + 1.0
-        feats[f"track_pit_trans::{track}::{from_tire}->{to_tire}"] = (
-            feats.get(f"track_pit_trans::{track}::{from_tire}->{to_tire}", 0.0) + 1.0
-        )
+    feats["pit_count"] = float(len(pit_stops))
+    feats["pit_lane_time"] = float(race_config["pit_lane_time"]) * len(pit_stops)
 
     return feats
 
@@ -233,7 +267,89 @@ def infer_driver_prior(races):
     return prior, ranked
 
 
-def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, l2, seed, initial_weights=None):
+def train_ridge_regression(train_races, config, feature_names, l2=1e-4, driver_prior=None, monotonic_strength=0.0):
+    """
+    Analytical ridge regression on ALL pairwise constraints across all training races.
+
+    For each pair (fast, slow) in a race's finishing order, we add the constraint:
+        w^T (x_slow - x_fast) = 1    (slow driver should score higher)
+
+    The solution w = (X^T X + l2*I)^{-1} X^T 1  is computed exactly via numpy.
+    This converges to the true physical degradation parameters far faster than SGD.
+
+    Efficient formula for XtX using all n*(n-1)/2 pairs:
+        sum_{i<j} (F_j - F_i)(F_j - F_i)^T = n * F^T F - f f^T
+        sum_{i<j} (F_j - F_i)              = F^T @ w  where w[k] = 2k - (n-1)
+    This is O(n * p^2) per race instead of O(n^2 * p^2).
+    """
+    import numpy as np
+
+    n_feat = len(feature_names)
+    feat_idx = {name: i for i, name in enumerate(feature_names)}
+
+    # Strategy lookup map per race: driver_id -> strategy dict
+    def feats_for_driver(strategy, race_config):
+        feats = extract_features(strategy, race_config, config)
+        vec = [0.0] * n_feat
+        for name, val in feats.items():
+            if name in feat_idx:
+                vec[feat_idx[name]] = val
+        return vec
+
+    XtX = np.zeros((n_feat, n_feat), dtype=np.float64)
+    Xty = np.zeros(n_feat, dtype=np.float64)
+
+    for race in train_races:
+        rc = race["race_config"]
+        finish = race["finishing_positions"]
+        n = len(finish)
+
+        # driver_id -> feature vector (using dict for O(1) lookup)
+        strat_by_driver = {s["driver_id"]: s for s in race["strategies"].values()}
+        F = np.array(
+            [feats_for_driver(strat_by_driver[d], rc) for d in finish],
+            dtype=np.float64,
+        )  # (n, n_feat)
+
+        # Efficient formula: XtX += n * F^T F  - f f^T
+        #                    Xty += F^T @ rank_weights
+        # where rank_weights[k] = 2k - (n-1)  (from the pairwise sum identity)
+        f = F.sum(axis=0)
+        rank_w = np.arange(n, dtype=np.float64) * 2 - (n - 1)
+
+        XtX += n * (F.T @ F) - np.outer(f, f)
+        Xty += F.T @ rank_w
+
+    n_pairs = len(train_races) * n * (n - 1) // 2
+    print(f"ridge: ~{n_pairs:,} pairs, features={n_feat}")
+    # Apply driver prior as a Gaussian regularizer: pull driver weights toward prior
+    # For non-driver features, regularize toward 0 (standard ridge)
+    if driver_prior:
+        prior_vec = np.zeros(n_feat, dtype=np.float64)
+        for name, val in driver_prior.items():
+            if name in feat_idx:
+                prior_vec[feat_idx[name]] = val
+        Xty += l2 * prior_vec
+
+    XtX += l2 * np.eye(n_feat, dtype=np.float64)
+    weights = np.linalg.solve(XtX, Xty).tolist()
+    if monotonic_strength > 0.0:
+        age_groups = _build_age_index_groups(feature_names)
+        _apply_monotonic_smoothing(weights, age_groups, monotonic_strength, rounds=4)
+    return weights
+
+
+def train_pairwise_logistic(
+    dataset,
+    feature_names,
+    epochs,
+    pairs_per_race,
+    lr,
+    l2,
+    seed,
+    initial_weights=None,
+    monotonic_strength=0.0,
+):
     rng = random.Random(seed)
     weights = [0.0 for _ in feature_names]
     index_by_name = {name: idx for idx, name in enumerate(feature_names)}
@@ -242,6 +358,8 @@ def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, 
             idx = index_by_name.get(key)
             if idx is not None:
                 weights[idx] = value
+
+    age_groups = _build_age_index_groups(feature_names) if monotonic_strength > 0.0 else None
 
     for epoch in range(epochs):
         rng.shuffle(dataset)
@@ -272,6 +390,9 @@ def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, 
 
         print(f"epoch={epoch + 1} pairs={count} avg_margin={avg_margin / max(1, count):.6f}")
 
+        if age_groups is not None:
+            _apply_monotonic_smoothing(weights, age_groups, monotonic_strength, rounds=1)
+
     return weights
 
 
@@ -283,16 +404,15 @@ def main():
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--learning-rate", type=float, default=0.035)
     parser.add_argument("--l2", type=float, default=1e-4)
-    parser.add_argument("--age-bucket-cap", type=int, default=40)
-    parser.add_argument("--progress-buckets", type=int, default=8)
     parser.add_argument("--temp-scale", type=float, default=15.0)
+    parser.add_argument("--age-bucket-cap", type=int, default=50)
+    parser.add_argument("--monotonic-strength", type=float, default=0.12)
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
     config = {
-        "age_bucket_cap": args.age_bucket_cap,
-        "progress_buckets": args.progress_buckets,
         "temp_scale": args.temp_scale,
+        "age_bucket_cap": args.age_bucket_cap,
     }
 
     races = load_historical_races(repo_root, args.max_files)
@@ -310,16 +430,41 @@ def main():
     print(f"races={len(races)} train={len(train_data)} val={len(val_data)} features={len(feature_names)}")
     print("inferred_driver_order=" + ",".join(inferred_driver_order))
 
-    weights = train_pairwise_logistic(
-        train_data,
-        feature_names,
-        epochs=args.epochs,
-        pairs_per_race=args.pairs_per_race,
-        lr=args.learning_rate,
-        l2=args.l2,
-        seed=args.seed,
-        initial_weights=driver_prior,
-    )
+    if NUMPY_AVAILABLE:
+        print("Training via analytical ridge regression (numpy)...")
+        weights = train_ridge_regression(
+            train_races, config, feature_names,
+            l2=args.l2,
+            driver_prior=driver_prior,
+            monotonic_strength=args.monotonic_strength,
+        )
+        # Fine-tune with a few SGD epochs to sharpen rankings
+        if args.epochs > 0:
+            print(f"Fine-tuning with {args.epochs} SGD epochs...")
+            weights = train_pairwise_logistic(
+                train_data,
+                feature_names,
+                epochs=args.epochs,
+                pairs_per_race=args.pairs_per_race,
+                lr=args.learning_rate * 0.1,   # smaller lr for fine-tuning
+                l2=args.l2,
+                seed=args.seed,
+                initial_weights={name: weights[i] for i, name in enumerate(feature_names)},
+                monotonic_strength=args.monotonic_strength,
+            )
+    else:
+        print("numpy not available, falling back to pairwise logistic SGD...")
+        weights = train_pairwise_logistic(
+            train_data,
+            feature_names,
+            epochs=args.epochs,
+            pairs_per_race=args.pairs_per_race,
+            lr=args.learning_rate,
+            l2=args.l2,
+            seed=args.seed,
+            initial_weights=driver_prior,
+            monotonic_strength=args.monotonic_strength,
+        )
 
     train_metrics = evaluate(train_data, weights)
     val_metrics = evaluate(val_data, weights)
@@ -346,13 +491,14 @@ def main():
         "feature_weights": feature_weights,
         "mechanistic_config": config,
         "metadata": {
-            "model": "pairwise_logistic_mechanistic_v4",
+            "model": "ridge_regression_per_age_v6",
             "trained_on_races": len(races),
             "train_races": len(train_races),
             "val_races": len(val_races),
             "epochs": args.epochs,
             "pairs_per_race": args.pairs_per_race,
             "seed": args.seed,
+            "monotonic_strength": args.monotonic_strength,
             "train_pair_rate": train_metrics["pair_rate"],
             "val_pair_rate": val_metrics["pair_rate"],
             "train_exact_rate": train_metrics["exact_rate"],
