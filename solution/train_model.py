@@ -15,6 +15,8 @@ def _compound_stats(starting_tire, pit_stops, total_laps):
     laps_by_tire = {t: 0 for t in TIRES}
     age_sum_by_tire = {t: 0.0 for t in TIRES}
     age2_sum_by_tire = {t: 0.0 for t in TIRES}
+    lapidx_sum_by_tire = {t: 0.0 for t in TIRES}
+    lapidx2_sum_by_tire = {t: 0.0 for t in TIRES}
     stints_by_tire = {t: 0 for t in TIRES}
     max_stint_by_tire = {t: 0 for t in TIRES}
 
@@ -25,10 +27,19 @@ def _compound_stats(starting_tire, pit_stops, total_laps):
         stop_lap = int(stop["lap"])
         stint_len = stop_lap - prev_lap
         if stint_len > 0:
+            start_lap = prev_lap + 1
+            end_lap = stop_lap
             laps_by_tire[current_tire] += stint_len
             age_sum_by_tire[current_tire] += (stint_len * (stint_len + 1)) / 2.0
             age2_sum_by_tire[current_tire] += (
                 stint_len * (stint_len + 1) * (2 * stint_len + 1)
+            ) / 6.0
+            lapidx_sum_by_tire[current_tire] += (
+                (start_lap + end_lap) * stint_len
+            ) / 2.0
+            lapidx2_sum_by_tire[current_tire] += (
+                end_lap * (end_lap + 1) * (2 * end_lap + 1)
+                - (start_lap - 1) * start_lap * (2 * start_lap - 1)
             ) / 6.0
             stints_by_tire[current_tire] += 1
             max_stint_by_tire[current_tire] = max(max_stint_by_tire[current_tire], stint_len)
@@ -37,15 +48,32 @@ def _compound_stats(starting_tire, pit_stops, total_laps):
 
     final_stint_len = total_laps - prev_lap
     if final_stint_len > 0:
+        start_lap = prev_lap + 1
+        end_lap = total_laps
         laps_by_tire[current_tire] += final_stint_len
         age_sum_by_tire[current_tire] += (final_stint_len * (final_stint_len + 1)) / 2.0
         age2_sum_by_tire[current_tire] += (
             final_stint_len * (final_stint_len + 1) * (2 * final_stint_len + 1)
         ) / 6.0
+        lapidx_sum_by_tire[current_tire] += (
+            (start_lap + end_lap) * final_stint_len
+        ) / 2.0
+        lapidx2_sum_by_tire[current_tire] += (
+            end_lap * (end_lap + 1) * (2 * end_lap + 1)
+            - (start_lap - 1) * start_lap * (2 * start_lap - 1)
+        ) / 6.0
         stints_by_tire[current_tire] += 1
         max_stint_by_tire[current_tire] = max(max_stint_by_tire[current_tire], final_stint_len)
 
-    return laps_by_tire, age_sum_by_tire, age2_sum_by_tire, stints_by_tire, max_stint_by_tire
+    return (
+        laps_by_tire,
+        age_sum_by_tire,
+        age2_sum_by_tire,
+        lapidx_sum_by_tire,
+        lapidx2_sum_by_tire,
+        stints_by_tire,
+        max_stint_by_tire,
+    )
 
 
 def extract_features(strategy, race_config, scales):
@@ -60,6 +88,8 @@ def extract_features(strategy, race_config, scales):
         laps_by_tire,
         age_sum_by_tire,
         age2_sum_by_tire,
+        lapidx_sum_by_tire,
+        lapidx2_sum_by_tire,
         stints_by_tire,
         max_stint_by_tire,
     ) = _compound_stats(strategy["starting_tire"], pit_stops, total_laps)
@@ -75,22 +105,29 @@ def extract_features(strategy, race_config, scales):
         laps = laps_by_tire[tire] / scales["laps"]
         ages = age_sum_by_tire[tire] / scales["ages"]
         ages2 = age2_sum_by_tire[tire] / scales["ages2"]
+        lapidx = lapidx_sum_by_tire[tire] / scales["lapidx"]
+        lapidx2 = lapidx2_sum_by_tire[tire] / scales["lapidx2"]
         stints = stints_by_tire[tire] / scales["stops"]
         max_stint = max_stint_by_tire[tire] / scales["max_stint"]
 
         feats[f"laps_{key}"] = laps
         feats[f"ages_{key}"] = ages
         feats[f"ages2_{key}"] = ages2
+        feats[f"lapidx_{key}"] = lapidx
+        feats[f"lapidx2_{key}"] = lapidx2
         feats[f"stints_{key}"] = stints
         feats[f"maxstint_{key}"] = max_stint
 
         feats[f"temp_laps_{key}"] = temp_norm * laps
         feats[f"temp_ages_{key}"] = temp_norm * ages
         feats[f"temp_ages2_{key}"] = temp_norm * ages2
+        feats[f"temp_lapidx_{key}"] = temp_norm * lapidx
+        feats[f"temp_lapidx2_{key}"] = temp_norm * lapidx2
 
         if track in TRACKS:
             feats[f"trk_{track}_laps_{key}"] = laps
             feats[f"trk_{track}_ages_{key}"] = ages
+            feats[f"trk_{track}_lapidx_{key}"] = lapidx
 
     return feats
 
@@ -231,6 +268,8 @@ def main():
         "laps": 100.0,
         "ages": 5000.0,
         "ages2": 200000.0,
+        "lapidx": 3500.0,
+        "lapidx2": 250000.0,
         "stops": 6.0,
         "pit_time_stops": 180.0,
         "max_stint": 70.0,
@@ -283,7 +322,7 @@ def main():
         "feature_weights": weights,
         "feature_scales": scales,
         "metadata": {
-            "model": "pairwise_logistic_sparse_v2",
+            "model": "pairwise_logistic_sparse_v3",
             "trained_on_races": len(races),
             "train_races": len(train_races),
             "val_races": len(val_races),
