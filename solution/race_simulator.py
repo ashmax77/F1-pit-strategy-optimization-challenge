@@ -43,6 +43,7 @@ def _driver_relative_time(strategy, race_config, model):
     temp_scale = float(config.get("temp_scale", 15.0))
 
     total_laps = int(race_config["total_laps"])
+    track = race_config["track"]
     track_temp = float(race_config["track_temp"])
     pit_lane_time = float(race_config["pit_lane_time"])
     pit_stops = strategy.get("pit_stops", [])
@@ -53,6 +54,17 @@ def _driver_relative_time(strategy, race_config, model):
     relative_time += weights.get(f"driver::{strategy['driver_id']}", 0.0)
     relative_time += weights.get("pit_count", 0.0) * len(pit_stops)
     relative_time += weights.get("pit_lane_time", 0.0) * (pit_lane_time * len(pit_stops))
+    relative_time += weights.get(f"track_pit_count::{track}", 0.0) * len(pit_stops)
+    relative_time += weights.get(f"track_pit_time::{track}", 0.0) * (pit_lane_time * len(pit_stops))
+
+    for stop in pit_stops:
+        stop_lap = int(stop["lap"])
+        from_tire = stop["from_tire"]
+        to_tire = stop["to_tire"]
+        stop_phase = _phase_bucket(stop_lap, total_laps, progress_buckets)
+        relative_time += weights.get(f"pit_trans::{from_tire}->{to_tire}", 0.0)
+        relative_time += weights.get(f"pit_trans_phase::{from_tire}->{to_tire}::{stop_phase}", 0.0)
+        relative_time += weights.get(f"track_pit_trans::{track}::{from_tire}->{to_tire}", 0.0)
 
     current_tire = strategy["starting_tire"]
     tire_age = 0
@@ -65,6 +77,8 @@ def _driver_relative_time(strategy, race_config, model):
         relative_time += weights.get(f"lap::{current_tire}::{age_bucket}", 0.0)
         relative_time += weights.get(f"temp::{current_tire}::{age_bucket}", 0.0) * temp_norm
         relative_time += weights.get(f"phase::{current_tire}::{phase_bucket}", 0.0)
+        relative_time += weights.get(f"track_lap::{track}::{current_tire}::{age_bucket}", 0.0)
+        relative_time += weights.get(f"track_phase::{track}::{current_tire}::{phase_bucket}", 0.0)
 
         if lap_number in stop_map:
             current_tire = stop_map[lap_number]
