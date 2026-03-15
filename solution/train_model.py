@@ -3,131 +3,54 @@ import argparse
 import json
 import math
 import random
+from collections import Counter, defaultdict
 from pathlib import Path
 
 
-TIRES = ("SOFT", "MEDIUM", "HARD")
-TRACKS = ("Bahrain", "COTA", "Monaco", "Monza", "Silverstone", "Spa", "Suzuka")
 REF_TEMP = 30.0
 
 
-def _compound_stats(starting_tire, pit_stops, total_laps):
-    laps_by_tire = {t: 0 for t in TIRES}
-    age_sum_by_tire = {t: 0.0 for t in TIRES}
-    age2_sum_by_tire = {t: 0.0 for t in TIRES}
-    lapidx_sum_by_tire = {t: 0.0 for t in TIRES}
-    lapidx2_sum_by_tire = {t: 0.0 for t in TIRES}
-    stints_by_tire = {t: 0 for t in TIRES}
-    max_stint_by_tire = {t: 0 for t in TIRES}
-
-    current_tire = starting_tire
-    prev_lap = 0
-
-    for stop in pit_stops:
-        stop_lap = int(stop["lap"])
-        stint_len = stop_lap - prev_lap
-        if stint_len > 0:
-            start_lap = prev_lap + 1
-            end_lap = stop_lap
-            laps_by_tire[current_tire] += stint_len
-            age_sum_by_tire[current_tire] += (stint_len * (stint_len + 1)) / 2.0
-            age2_sum_by_tire[current_tire] += (
-                stint_len * (stint_len + 1) * (2 * stint_len + 1)
-            ) / 6.0
-            lapidx_sum_by_tire[current_tire] += (
-                (start_lap + end_lap) * stint_len
-            ) / 2.0
-            lapidx2_sum_by_tire[current_tire] += (
-                end_lap * (end_lap + 1) * (2 * end_lap + 1)
-                - (start_lap - 1) * start_lap * (2 * start_lap - 1)
-            ) / 6.0
-            stints_by_tire[current_tire] += 1
-            max_stint_by_tire[current_tire] = max(max_stint_by_tire[current_tire], stint_len)
-        current_tire = stop["to_tire"]
-        prev_lap = stop_lap
-
-    final_stint_len = total_laps - prev_lap
-    if final_stint_len > 0:
-        start_lap = prev_lap + 1
-        end_lap = total_laps
-        laps_by_tire[current_tire] += final_stint_len
-        age_sum_by_tire[current_tire] += (final_stint_len * (final_stint_len + 1)) / 2.0
-        age2_sum_by_tire[current_tire] += (
-            final_stint_len * (final_stint_len + 1) * (2 * final_stint_len + 1)
-        ) / 6.0
-        lapidx_sum_by_tire[current_tire] += (
-            (start_lap + end_lap) * final_stint_len
-        ) / 2.0
-        lapidx2_sum_by_tire[current_tire] += (
-            end_lap * (end_lap + 1) * (2 * end_lap + 1)
-            - (start_lap - 1) * start_lap * (2 * start_lap - 1)
-        ) / 6.0
-        stints_by_tire[current_tire] += 1
-        max_stint_by_tire[current_tire] = max(max_stint_by_tire[current_tire], final_stint_len)
-
-    return (
-        laps_by_tire,
-        age_sum_by_tire,
-        age2_sum_by_tire,
-        lapidx_sum_by_tire,
-        lapidx2_sum_by_tire,
-        stints_by_tire,
-        max_stint_by_tire,
-    )
+def _age_bucket(age, age_bucket_cap):
+    return min(age, age_bucket_cap)
 
 
-def extract_features(strategy, race_config, scales):
+def _phase_bucket(lap_number, total_laps, progress_buckets):
+    return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
+
+
+def _iter_laps(strategy, total_laps):
+    tire = strategy["starting_tire"]
+    stop_map = {int(stop["lap"]): stop["to_tire"] for stop in strategy.get("pit_stops", [])}
+    tire_age = 0
+
+    for lap_number in range(1, total_laps + 1):
+        tire_age += 1
+        yield lap_number, tire, tire_age
+        if lap_number in stop_map:
+            tire = stop_map[lap_number]
+            tire_age = 0
+
+
+def extract_features(strategy, race_config, config):
     total_laps = int(race_config["total_laps"])
-    track = race_config["track"]
-    track_temp = float(race_config["track_temp"])
-    temp_norm = (track_temp - REF_TEMP) / scales["temp_norm"]
-    pit_lane_time = float(race_config["pit_lane_time"])
+    temp_norm = (float(race_config["track_temp"]) - REF_TEMP) / config["temp_scale"]
     pit_stops = strategy.get("pit_stops", [])
 
-    (
-        laps_by_tire,
-        age_sum_by_tire,
-        age2_sum_by_tire,
-        lapidx_sum_by_tire,
-        lapidx2_sum_by_tire,
-        stints_by_tire,
-        max_stint_by_tire,
-    ) = _compound_stats(strategy["starting_tire"], pit_stops, total_laps)
-
     feats = {
-        "stops": len(pit_stops) / scales["stops"],
-        "pit_time_stops": (pit_lane_time * len(pit_stops)) / scales["pit_time_stops"],
-        f"drv_{strategy['driver_id']}": 1.0,
+        f"driver::{strategy['driver_id']}": 1.0,
+        "pit_count": float(len(pit_stops)),
+        "pit_lane_time": float(race_config["pit_lane_time"]) * len(pit_stops),
     }
 
-    for tire in TIRES:
-        key = tire.lower()
-        laps = laps_by_tire[tire] / scales["laps"]
-        ages = age_sum_by_tire[tire] / scales["ages"]
-        ages2 = age2_sum_by_tire[tire] / scales["ages2"]
-        lapidx = lapidx_sum_by_tire[tire] / scales["lapidx"]
-        lapidx2 = lapidx2_sum_by_tire[tire] / scales["lapidx2"]
-        stints = stints_by_tire[tire] / scales["stops"]
-        max_stint = max_stint_by_tire[tire] / scales["max_stint"]
-
-        feats[f"laps_{key}"] = laps
-        feats[f"ages_{key}"] = ages
-        feats[f"ages2_{key}"] = ages2
-        feats[f"lapidx_{key}"] = lapidx
-        feats[f"lapidx2_{key}"] = lapidx2
-        feats[f"stints_{key}"] = stints
-        feats[f"maxstint_{key}"] = max_stint
-
-        feats[f"temp_laps_{key}"] = temp_norm * laps
-        feats[f"temp_ages_{key}"] = temp_norm * ages
-        feats[f"temp_ages2_{key}"] = temp_norm * ages2
-        feats[f"temp_lapidx_{key}"] = temp_norm * lapidx
-        feats[f"temp_lapidx2_{key}"] = temp_norm * lapidx2
-
-        if track in TRACKS:
-            feats[f"trk_{track}_laps_{key}"] = laps
-            feats[f"trk_{track}_ages_{key}"] = ages
-            feats[f"trk_{track}_lapidx_{key}"] = lapidx
+    for lap_number, tire, tire_age in _iter_laps(strategy, total_laps):
+        age_bucket = _age_bucket(tire_age, config["age_bucket_cap"])
+        phase_bucket = _phase_bucket(lap_number, total_laps, config["progress_buckets"])
+        lap_key = f"lap::{tire}::{age_bucket}"
+        temp_key = f"temp::{tire}::{age_bucket}"
+        phase_key = f"phase::{tire}::{phase_bucket}"
+        feats[lap_key] = feats.get(lap_key, 0.0) + 1.0
+        feats[temp_key] = feats.get(temp_key, 0.0) + temp_norm
+        feats[phase_key] = feats.get(phase_key, 0.0) + 1.0
 
     return feats
 
@@ -145,19 +68,18 @@ def load_historical_races(repo_root, max_files=None):
     return races
 
 
-def prepare_race_dataset(races, scales):
+def prepare_race_dataset(races, config):
     dataset = []
     all_feature_names = set()
 
     for race in races:
         race_config = race["race_config"]
-        strategies = race["strategies"]
         true_order = race["finishing_positions"]
-
         feature_map = {}
-        for strategy in strategies.values():
+
+        for strategy in race["strategies"].values():
             driver_id = strategy["driver_id"]
-            feats = extract_features(strategy, race_config, scales)
+            feats = extract_features(strategy, race_config, config)
             feature_map[driver_id] = feats
             all_feature_names.update(feats.keys())
 
@@ -186,17 +108,13 @@ def evaluate(dataset, weights):
     pair_total = 0
 
     for true_order, feature_map in dataset:
-        pred = sorted(
-            true_order,
-            key=lambda d: score_driver(weights, feature_map[d]),
-        )
+        pred = sorted(true_order, key=lambda driver_id: score_driver(weights, feature_map[driver_id]))
         if pred == true_order:
             exact += 1
 
-        rank = {d: i for i, d in enumerate(true_order)}
-        n = len(pred)
-        for i in range(n):
-            for j in range(i + 1, n):
+        rank = {driver_id: index for index, driver_id in enumerate(true_order)}
+        for i in range(len(pred)):
+            for j in range(i + 1, len(pred)):
                 if rank[pred[i]] < rank[pred[j]]:
                     pair_ok += 1
                 pair_total += 1
@@ -209,9 +127,53 @@ def evaluate(dataset, weights):
     }
 
 
-def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, l2, seed):
+def _strategy_signature(strategy):
+    return (
+        strategy["starting_tire"],
+        tuple((int(stop["lap"]), stop["to_tire"]) for stop in strategy.get("pit_stops", [])),
+    )
+
+
+def infer_driver_prior(races):
+    wins = Counter()
+    losses = Counter()
+
+    for race in races:
+        by_signature = defaultdict(list)
+        finish_index = {driver_id: idx for idx, driver_id in enumerate(race["finishing_positions"])}
+
+        for strategy in race["strategies"].values():
+            by_signature[_strategy_signature(strategy)].append(strategy["driver_id"])
+
+        for drivers in by_signature.values():
+            if len(drivers) < 2:
+                continue
+            ordered = sorted(drivers, key=lambda driver_id: finish_index[driver_id])
+            for idx, winner in enumerate(ordered):
+                wins[winner] += len(ordered) - idx - 1
+                losses[winner] += idx
+
+    ranked = sorted(
+        {f"D{index:03d}" for index in range(1, 21)},
+        key=lambda driver_id: (wins[driver_id] - losses[driver_id], wins[driver_id]),
+        reverse=True,
+    )
+    center = (len(ranked) - 1) / 2.0
+    scale = max(1.0, center)
+
+    prior = {}
+    for idx, driver_id in enumerate(ranked):
+        prior[f"driver::{driver_id}"] = (idx - center) / scale
+    return prior, ranked
+
+
+def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, l2, seed, initial_weights=None):
     rng = random.Random(seed)
     weights = {name: 0.0 for name in feature_names}
+    if initial_weights:
+        for key, value in initial_weights.items():
+            if key in weights:
+                weights[key] = value
 
     for epoch in range(epochs):
         rng.shuffle(dataset)
@@ -231,22 +193,21 @@ def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, 
 
                 keys = set(slow_feats.keys())
                 keys.update(fast_feats.keys())
-                diff = {k: slow_feats.get(k, 0.0) - fast_feats.get(k, 0.0) for k in keys}
+                diff = {key: slow_feats.get(key, 0.0) - fast_feats.get(key, 0.0) for key in keys}
 
                 margin = dot(weights, diff)
                 avg_margin += margin
                 count += 1
 
-                # Numerical-stable sigmoid(-margin)
                 if margin >= 0:
                     exp_term = math.exp(-margin)
-                    g = exp_term / (1.0 + exp_term)
+                    gradient = exp_term / (1.0 + exp_term)
                 else:
                     exp_term = math.exp(margin)
-                    g = 1.0 / (1.0 + exp_term)
+                    gradient = 1.0 / (1.0 + exp_term)
 
                 for key, value in diff.items():
-                    weights[key] = weights.get(key, 0.0) + lr * (g * value - l2 * weights.get(key, 0.0))
+                    weights[key] = weights.get(key, 0.0) + lr * (gradient * value - l2 * weights.get(key, 0.0))
 
         print(f"epoch={epoch + 1} pairs={count} avg_margin={avg_margin / max(1, count):.6f}")
 
@@ -254,26 +215,23 @@ def train_pairwise_logistic(dataset, feature_names, epochs, pairs_per_race, lr, 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train weighted ranking model from historical races")
+    parser = argparse.ArgumentParser(description="Train mechanistic lap-by-lap timing model from historical races")
     parser.add_argument("--max-files", type=int, default=None)
-    parser.add_argument("--epochs", type=int, default=12)
-    parser.add_argument("--pairs-per-race", type=int, default=140)
+    parser.add_argument("--epochs", type=int, default=8)
+    parser.add_argument("--pairs-per-race", type=int, default=90)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--learning-rate", type=float, default=0.06)
-    parser.add_argument("--l2", type=float, default=2e-4)
+    parser.add_argument("--learning-rate", type=float, default=0.035)
+    parser.add_argument("--l2", type=float, default=1e-4)
+    parser.add_argument("--age-bucket-cap", type=int, default=40)
+    parser.add_argument("--progress-buckets", type=int, default=8)
+    parser.add_argument("--temp-scale", type=float, default=15.0)
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
-    scales = {
-        "laps": 100.0,
-        "ages": 5000.0,
-        "ages2": 200000.0,
-        "lapidx": 3500.0,
-        "lapidx2": 250000.0,
-        "stops": 6.0,
-        "pit_time_stops": 180.0,
-        "max_stint": 70.0,
-        "temp_norm": 15.0,
+    config = {
+        "age_bucket_cap": args.age_bucket_cap,
+        "progress_buckets": args.progress_buckets,
+        "temp_scale": args.temp_scale,
     }
 
     races = load_historical_races(repo_root, args.max_files)
@@ -283,11 +241,13 @@ def main():
     train_races = races[:split]
     val_races = races[split:]
 
-    train_data, feat_names_train = prepare_race_dataset(train_races, scales)
-    val_data, feat_names_val = prepare_race_dataset(val_races, scales)
-
+    train_data, feat_names_train = prepare_race_dataset(train_races, config)
+    val_data, feat_names_val = prepare_race_dataset(val_races, config)
     feature_names = sorted(set(feat_names_train).union(feat_names_val))
+    driver_prior, inferred_driver_order = infer_driver_prior(train_races)
+
     print(f"races={len(races)} train={len(train_data)} val={len(val_data)} features={len(feature_names)}")
+    print("inferred_driver_order=" + ",".join(inferred_driver_order))
 
     weights = train_pairwise_logistic(
         train_data,
@@ -297,6 +257,7 @@ def main():
         lr=args.learning_rate,
         l2=args.l2,
         seed=args.seed,
+        initial_weights=driver_prior,
     )
 
     train_metrics = evaluate(train_data, weights)
@@ -320,9 +281,9 @@ def main():
 
     model = {
         "feature_weights": weights,
-        "feature_scales": scales,
+        "mechanistic_config": config,
         "metadata": {
-            "model": "pairwise_logistic_sparse_v3",
+            "model": "pairwise_logistic_mechanistic_v4",
             "trained_on_races": len(races),
             "train_races": len(train_races),
             "val_races": len(val_races),
@@ -331,6 +292,9 @@ def main():
             "seed": args.seed,
             "train_pair_rate": train_metrics["pair_rate"],
             "val_pair_rate": val_metrics["pair_rate"],
+            "train_exact_rate": train_metrics["exact_rate"],
+            "val_exact_rate": val_metrics["exact_rate"],
+            "inferred_driver_order": inferred_driver_order,
         },
     }
 
