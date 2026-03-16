@@ -1,0 +1,1051 @@
+{
+  "summary": {
+    "total": 100,
+    "passed": 31,
+    "failed": 69,
+    "pattern_totals": {
+      "pit_count_mismatch": 0,
+      "same_strategy_near_tie": 14,
+      "late_stint_reversal": 142,
+      "temperature_sensitive_flip": 16,
+      "near_tie_count": 0
+    }
+  },
+  "failed_races": [
+    {
+      "race_id": "TEST_001",
+      "track": "Monaco",
+      "track_temp": 32,
+      "mismatches": 10,
+      "avg_adjacent_gap": 0.7394339523821923,
+      "min_adjacent_gap": 0.02068884441280261,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_003",
+      "track": "Suzuka",
+      "track_temp": 32,
+      "mismatches": 11,
+      "avg_adjacent_gap": 3.304887725355226,
+      "min_adjacent_gap": 0.09178658215591895,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_004",
+      "track": "Bahrain",
+      "track_temp": 29,
+      "mismatches": 10,
+      "avg_adjacent_gap": 2.889287566032362,
+      "min_adjacent_gap": 0.0020670005226293142,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 2,
+        "late_stint_reversal": 5,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_006",
+      "track": "Silverstone",
+      "track_temp": 42,
+      "mismatches": 13,
+      "avg_adjacent_gap": 3.5060917131245857,
+      "min_adjacent_gap": 0.08832846064586874,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 5,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_007",
+      "track": "Monza",
+      "track_temp": 19,
+      "mismatches": 9,
+      "avg_adjacent_gap": 5.480036968758375,
+      "min_adjacent_gap": 0.1216690784857235,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_008",
+      "track": "Monza",
+      "track_temp": 23,
+      "mismatches": 10,
+      "avg_adjacent_gap": 6.822867357401405,
+      "min_adjacent_gap": 0.2799043878212615,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_009",
+      "track": "Bahrain",
+      "track_temp": 33,
+      "mismatches": 2,
+      "avg_adjacent_gap": 12.95007212201496,
+      "min_adjacent_gap": 0.2943312353050658,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_012",
+      "track": "Monaco",
+      "track_temp": 30,
+      "mismatches": 10,
+      "avg_adjacent_gap": 7.542101934097586,
+      "min_adjacent_gap": 0.15907274097602908,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_013",
+      "track": "Silverstone",
+      "track_temp": 33,
+      "mismatches": 9,
+      "avg_adjacent_gap": 11.28219216217621,
+      "min_adjacent_gap": 0.016529067813337406,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_015",
+      "track": "Monza",
+      "track_temp": 32,
+      "mismatches": 14,
+      "avg_adjacent_gap": 1.2840046328600614,
+      "min_adjacent_gap": 0.047220132234983225,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 6,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_016",
+      "track": "Suzuka",
+      "track_temp": 39,
+      "mismatches": 8,
+      "avg_adjacent_gap": 7.755818250465311,
+      "min_adjacent_gap": 0.048183660646344606,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_018",
+      "track": "Bahrain",
+      "track_temp": 28,
+      "mismatches": 11,
+      "avg_adjacent_gap": 0.709542410800248,
+      "min_adjacent_gap": 0.0017511956639992832,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 3,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_019",
+      "track": "Bahrain",
+      "track_temp": 28,
+      "mismatches": 12,
+      "avg_adjacent_gap": 0.6622498177066533,
+      "min_adjacent_gap": 0.01907115230133627,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_020",
+      "track": "Spa",
+      "track_temp": 38,
+      "mismatches": 5,
+      "avg_adjacent_gap": 21.169576484700325,
+      "min_adjacent_gap": 0.23324308910065383,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_022",
+      "track": "COTA",
+      "track_temp": 26,
+      "mismatches": 5,
+      "avg_adjacent_gap": 8.006938228255947,
+      "min_adjacent_gap": 0.08393406560671224,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_024",
+      "track": "Silverstone",
+      "track_temp": 22,
+      "mismatches": 10,
+      "avg_adjacent_gap": 4.502516020491022,
+      "min_adjacent_gap": 0.05494816717163076,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_026",
+      "track": "Spa",
+      "track_temp": 33,
+      "mismatches": 17,
+      "avg_adjacent_gap": 0.5588367781427517,
+      "min_adjacent_gap": 0.019901616292059998,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_029",
+      "track": "Monza",
+      "track_temp": 31,
+      "mismatches": 14,
+      "avg_adjacent_gap": 5.629173940181666,
+      "min_adjacent_gap": 0.17776078125632466,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_030",
+      "track": "Monza",
+      "track_temp": 32,
+      "mismatches": 10,
+      "avg_adjacent_gap": 1.3143191391429772,
+      "min_adjacent_gap": 0.01894617657566755,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_031",
+      "track": "COTA",
+      "track_temp": 28,
+      "mismatches": 18,
+      "avg_adjacent_gap": 0.5337199574843884,
+      "min_adjacent_gap": 0.02956984604986701,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_032",
+      "track": "COTA",
+      "track_temp": 29,
+      "mismatches": 8,
+      "avg_adjacent_gap": 1.6509577800948152,
+      "min_adjacent_gap": 0.038498567154903185,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_033",
+      "track": "Bahrain",
+      "track_temp": 32,
+      "mismatches": 4,
+      "avg_adjacent_gap": 9.076029615002776,
+      "min_adjacent_gap": 0.03706915732331595,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_034",
+      "track": "Bahrain",
+      "track_temp": 29,
+      "mismatches": 11,
+      "avg_adjacent_gap": 3.8861447890732737,
+      "min_adjacent_gap": 0.03190691395249701,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_037",
+      "track": "Spa",
+      "track_temp": 40,
+      "mismatches": 11,
+      "avg_adjacent_gap": 6.581702353097748,
+      "min_adjacent_gap": 0.03009338552982399,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_040",
+      "track": "COTA",
+      "track_temp": 23,
+      "mismatches": 4,
+      "avg_adjacent_gap": 15.102030885577607,
+      "min_adjacent_gap": 0.25804373624507093,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_041",
+      "track": "COTA",
+      "track_temp": 28,
+      "mismatches": 14,
+      "avg_adjacent_gap": 4.606303055186115,
+      "min_adjacent_gap": 0.021139709027352183,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_042",
+      "track": "Monaco",
+      "track_temp": 37,
+      "mismatches": 10,
+      "avg_adjacent_gap": 14.427976997347843,
+      "min_adjacent_gap": 0.7196607695636033,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_043",
+      "track": "Bahrain",
+      "track_temp": 41,
+      "mismatches": 16,
+      "avg_adjacent_gap": 1.5152614196884773,
+      "min_adjacent_gap": 0.05205207963007297,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 5,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_045",
+      "track": "COTA",
+      "track_temp": 33,
+      "mismatches": 2,
+      "avg_adjacent_gap": 13.10285057312579,
+      "min_adjacent_gap": 0.48615321783441345,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_046",
+      "track": "Silverstone",
+      "track_temp": 28,
+      "mismatches": 13,
+      "avg_adjacent_gap": 0.7945082837924725,
+      "min_adjacent_gap": 0.02817356710609431,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_048",
+      "track": "COTA",
+      "track_temp": 29,
+      "mismatches": 16,
+      "avg_adjacent_gap": 0.6996414716646724,
+      "min_adjacent_gap": 0.0010387238242515195,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_049",
+      "track": "Monaco",
+      "track_temp": 29,
+      "mismatches": 13,
+      "avg_adjacent_gap": 4.537243755820789,
+      "min_adjacent_gap": 0.015245354004747469,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 4,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_050",
+      "track": "Monza",
+      "track_temp": 30,
+      "mismatches": 7,
+      "avg_adjacent_gap": 3.0715820402935186,
+      "min_adjacent_gap": 0.013374013487862157,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_051",
+      "track": "Monza",
+      "track_temp": 27,
+      "mismatches": 6,
+      "avg_adjacent_gap": 11.465026588914823,
+      "min_adjacent_gap": 0.0384225036128214,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_053",
+      "track": "Suzuka",
+      "track_temp": 33,
+      "mismatches": 4,
+      "avg_adjacent_gap": 17.788925588600907,
+      "min_adjacent_gap": 0.28951741965875044,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_054",
+      "track": "Monaco",
+      "track_temp": 31,
+      "mismatches": 15,
+      "avg_adjacent_gap": 0.6033799327324494,
+      "min_adjacent_gap": 0.01661640410205223,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_055",
+      "track": "Monza",
+      "track_temp": 28,
+      "mismatches": 15,
+      "avg_adjacent_gap": 1.5684091938790696,
+      "min_adjacent_gap": 0.012685595537050176,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_056",
+      "track": "Suzuka",
+      "track_temp": 29,
+      "mismatches": 5,
+      "avg_adjacent_gap": 8.001505850733077,
+      "min_adjacent_gap": 0.20663025264479984,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_057",
+      "track": "Monaco",
+      "track_temp": 34,
+      "mismatches": 4,
+      "avg_adjacent_gap": 8.307738064168671,
+      "min_adjacent_gap": 0.05011134969413433,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_058",
+      "track": "Monza",
+      "track_temp": 27,
+      "mismatches": 11,
+      "avg_adjacent_gap": 4.409339213479292,
+      "min_adjacent_gap": 0.17979923839087064,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_060",
+      "track": "Spa",
+      "track_temp": 29,
+      "mismatches": 13,
+      "avg_adjacent_gap": 0.5884087834318286,
+      "min_adjacent_gap": 0.0873393746314548,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_061",
+      "track": "Bahrain",
+      "track_temp": 27,
+      "mismatches": 4,
+      "avg_adjacent_gap": 15.151176881816983,
+      "min_adjacent_gap": 0.0337395786915522,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_062",
+      "track": "Bahrain",
+      "track_temp": 32,
+      "mismatches": 10,
+      "avg_adjacent_gap": 1.3123171526985373,
+      "min_adjacent_gap": 0.03257140088550159,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_064",
+      "track": "Monaco",
+      "track_temp": 20,
+      "mismatches": 9,
+      "avg_adjacent_gap": 4.273612308914876,
+      "min_adjacent_gap": 0.2162981715214869,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 5,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_065",
+      "track": "Suzuka",
+      "track_temp": 30,
+      "mismatches": 14,
+      "avg_adjacent_gap": 1.5972956768767823,
+      "min_adjacent_gap": 0.07873441332068865,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 4,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_066",
+      "track": "Monaco",
+      "track_temp": 27,
+      "mismatches": 12,
+      "avg_adjacent_gap": 2.436447374593768,
+      "min_adjacent_gap": 0.09049244008386381,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_067",
+      "track": "Monza",
+      "track_temp": 28,
+      "mismatches": 12,
+      "avg_adjacent_gap": 0.60014572023395,
+      "min_adjacent_gap": 0.02847788123503392,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_070",
+      "track": "Monza",
+      "track_temp": 29,
+      "mismatches": 4,
+      "avg_adjacent_gap": 0.5815313698235379,
+      "min_adjacent_gap": 0.03503426118027164,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_071",
+      "track": "Spa",
+      "track_temp": 31,
+      "mismatches": 9,
+      "avg_adjacent_gap": 13.521006353733807,
+      "min_adjacent_gap": 0.04523147771158165,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_075",
+      "track": "Monza",
+      "track_temp": 31,
+      "mismatches": 11,
+      "avg_adjacent_gap": 2.1159114163442383,
+      "min_adjacent_gap": 0.0054964230898235655,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 4,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_077",
+      "track": "Monaco",
+      "track_temp": 30,
+      "mismatches": 9,
+      "avg_adjacent_gap": 1.0101461150697417,
+      "min_adjacent_gap": 0.003915662490641125,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_079",
+      "track": "Monaco",
+      "track_temp": 30,
+      "mismatches": 17,
+      "avg_adjacent_gap": 0.605767287212917,
+      "min_adjacent_gap": 0.004913558885164093,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_080",
+      "track": "Monaco",
+      "track_temp": 22,
+      "mismatches": 13,
+      "avg_adjacent_gap": 4.061925576571069,
+      "min_adjacent_gap": 0.06470185772562331,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 4,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_082",
+      "track": "Bahrain",
+      "track_temp": 36,
+      "mismatches": 8,
+      "avg_adjacent_gap": 4.449934629199113,
+      "min_adjacent_gap": 0.026233024260420734,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_083",
+      "track": "Monaco",
+      "track_temp": 29,
+      "mismatches": 11,
+      "avg_adjacent_gap": 1.983635344913197,
+      "min_adjacent_gap": 0.021681765762167515,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_084",
+      "track": "Silverstone",
+      "track_temp": 29,
+      "mismatches": 9,
+      "avg_adjacent_gap": 8.920692109643461,
+      "min_adjacent_gap": 0.010067716530670623,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_085",
+      "track": "Suzuka",
+      "track_temp": 34,
+      "mismatches": 3,
+      "avg_adjacent_gap": 15.964143572744293,
+      "min_adjacent_gap": 0.7198714325965767,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_087",
+      "track": "Suzuka",
+      "track_temp": 28,
+      "mismatches": 7,
+      "avg_adjacent_gap": 4.580669425716384,
+      "min_adjacent_gap": 0.04348148793422979,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_089",
+      "track": "Monza",
+      "track_temp": 30,
+      "mismatches": 11,
+      "avg_adjacent_gap": 6.607912668216109,
+      "min_adjacent_gap": 0.06653789519054953,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_090",
+      "track": "Suzuka",
+      "track_temp": 31,
+      "mismatches": 5,
+      "avg_adjacent_gap": 13.235624146233313,
+      "min_adjacent_gap": 0.10280336417184799,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_091",
+      "track": "Spa",
+      "track_temp": 28,
+      "mismatches": 11,
+      "avg_adjacent_gap": 0.7600722363833976,
+      "min_adjacent_gap": 0.010572291542558787,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 1,
+        "late_stint_reversal": 3,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_093",
+      "track": "Suzuka",
+      "track_temp": 33,
+      "mismatches": 6,
+      "avg_adjacent_gap": 6.618915121325402,
+      "min_adjacent_gap": 0.01322334503478828,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_094",
+      "track": "Suzuka",
+      "track_temp": 33,
+      "mismatches": 15,
+      "avg_adjacent_gap": 0.6598974259511369,
+      "min_adjacent_gap": 0.05306006081565329,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 1,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_095",
+      "track": "Suzuka",
+      "track_temp": 30,
+      "mismatches": 10,
+      "avg_adjacent_gap": 8.321689245305421,
+      "min_adjacent_gap": 0.07647417297366133,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_096",
+      "track": "Suzuka",
+      "track_temp": 28,
+      "mismatches": 2,
+      "avg_adjacent_gap": 13.92515558843292,
+      "min_adjacent_gap": 1.7485855009858255,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 0,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_097",
+      "track": "Silverstone",
+      "track_temp": 28,
+      "mismatches": 14,
+      "avg_adjacent_gap": 7.422765779726265,
+      "min_adjacent_gap": 0.18352514719353508,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 4,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_098",
+      "track": "COTA",
+      "track_temp": 33,
+      "mismatches": 7,
+      "avg_adjacent_gap": 4.991465603921273,
+      "min_adjacent_gap": 0.023903274537133257,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_099",
+      "track": "Monza",
+      "track_temp": 31,
+      "mismatches": 8,
+      "avg_adjacent_gap": 0.31464592908323735,
+      "min_adjacent_gap": 0.047088992414529685,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 1,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    },
+    {
+      "race_id": "TEST_100",
+      "track": "Bahrain",
+      "track_temp": 37,
+      "mismatches": 5,
+      "avg_adjacent_gap": 6.464878700180105,
+      "min_adjacent_gap": 0.5437692922556039,
+      "pattern": {
+        "pit_count_mismatch": 0,
+        "same_strategy_near_tie": 0,
+        "late_stint_reversal": 2,
+        "temperature_sensitive_flip": 0,
+        "near_tie_count": 0
+      }
+    }
+  ]
+}
