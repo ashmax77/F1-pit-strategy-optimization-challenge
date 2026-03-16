@@ -18,6 +18,11 @@ def _phase_bucket(lap_number, total_laps, progress_buckets):
     return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
 
 
+def _temp_bin(track_temp):
+    t = int(round(float(track_temp)))
+    return max(15, min(45, (t // 3) * 3))
+
+
 def _default_model():
     return {
         "mechanistic_params": {
@@ -69,6 +74,7 @@ def _load_model():
 def _driver_relative_time_legacy(strategy, race_config, model):
     weights = model.get("feature_weights", {})
     config = model.get("mechanistic_config", {})
+    metadata = model.get("metadata", {})
     temp_scale = float(config.get("temp_scale", 15.0))
     age_bucket_cap = int(config.get("age_bucket_cap", 50))
     progress_buckets = int(config.get("progress_buckets", 8))
@@ -82,11 +88,15 @@ def _driver_relative_time_legacy(strategy, race_config, model):
 
     stop_map = {int(stop["lap"]): stop["to_tire"] for stop in pit_stops}
     track = race_config.get("track", "")
+    driver_id = strategy["driver_id"]
+    tbin = _temp_bin(track_temp)
     relative_time = weights.get(f"driver::{strategy['driver_id']}", 0.0)
     relative_time += weights.get("pit_count", 0.0) * len(pit_stops)
     relative_time += weights.get("pit_lane_time", 0.0) * (pit_lane_time * len(pit_stops))
     relative_time += weights.get(f"track::{track}", 0.0)
     relative_time += weights.get(f"track_temp::{track}", 0.0) * temp_norm
+    relative_time += weights.get(f"driver_track::{driver_id}::{track}", 0.0)
+    relative_time += weights.get(f"driver_temp_bin::{driver_id}::{tbin}", 0.0)
 
     for stop in pit_stops:
         phase_bucket = _phase_bucket(int(stop["lap"]), total_laps, progress_buckets)
@@ -100,6 +110,20 @@ def _driver_relative_time_legacy(strategy, race_config, model):
     relative_time += weights.get(f"last_stint_tire::{last_tire}", 0.0)
     relative_time += weights.get(f"last_stint_phase::{last_stint_phase}", 0.0)
     relative_time += weights.get(f"last_stint_temp::{last_tire}", 0.0) * (temp_norm * last_stint_len)
+
+    # Optional nonlinear runtime corrections, tuned separately via metadata.
+    race_len = float(total_laps) if total_laps > 0 else 1.0
+    last_stop_ratio = float(last_stop_lap) / race_len
+    last_stint_ratio = float(last_stint_len) / race_len
+    late_hinge = float(metadata.get("late_stop_hinge", 0.65))
+    early_hinge = float(metadata.get("early_stop_hinge", 0.12))
+    short_hinge = float(metadata.get("short_last_stint_hinge", 0.16))
+    long_hinge = float(metadata.get("long_last_stint_hinge", 0.55))
+    relative_time += float(metadata.get("late_stop_penalty", 0.0)) * max(0.0, last_stop_ratio - late_hinge)
+    relative_time += float(metadata.get("early_stop_penalty", 0.0)) * max(0.0, early_hinge - last_stop_ratio)
+    relative_time += float(metadata.get("short_last_stint_penalty", 0.0)) * max(0.0, short_hinge - last_stint_ratio)
+    relative_time += float(metadata.get("long_last_stint_penalty", 0.0)) * max(0.0, last_stint_ratio - long_hinge)
+    relative_time += float(metadata.get(f"final_tire_bias::{last_tire}", 0.0))
 
     current_tire = strategy["starting_tire"]
     tire_age = 0

@@ -21,6 +21,11 @@ def _phase_bucket(lap_number, total_laps, progress_buckets):
     return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
 
 
+def _temp_bin(track_temp):
+    t = int(round(float(track_temp)))
+    return max(15, min(45, (t // 3) * 3))
+
+
 def _build_age_index_groups(feature_names):
     groups = {
         "lap": {"SOFT": [], "MEDIUM": [], "HARD": []},
@@ -93,8 +98,12 @@ def extract_features(strategy, race_config, config):
 
     feats = {f"driver::{strategy['driver_id']}": 1.0}
     track = race_config["track"]
+    tbin = _temp_bin(race_config["track_temp"])
+    driver_id = strategy["driver_id"]
     feats[f"track::{track}"] = 1.0
     feats[f"track_temp::{track}"] = temp_norm
+    feats[f"driver_track::{driver_id}::{track}"] = 1.0
+    feats[f"driver_temp_bin::{driver_id}::{tbin}"] = 1.0
 
     for lap_number, tire, tire_age, stint_index in _iter_laps(strategy, total_laps):
         bucket = min(tire_age, age_bucket_cap)

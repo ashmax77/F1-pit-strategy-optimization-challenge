@@ -13,6 +13,11 @@ def _phase_bucket(lap_number, total_laps, progress_buckets):
     return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
 
 
+def _temp_bin(track_temp):
+    t = int(round(float(track_temp)))
+    return max(15, min(45, (t // 3) * 3))
+
+
 def extract_feature_map(strategy, race_config, config):
     temp_scale = float(config.get("temp_scale", 15.0))
     age_bucket_cap = int(config.get("age_bucket_cap", 50))
@@ -31,8 +36,11 @@ def extract_feature_map(strategy, race_config, config):
     feats["pit_lane_time"] = pit_lane_time * len(pit_stops)
 
     track = race_config.get("track", "")
+    tbin = _temp_bin(track_temp)
     feats[f"track::{track}"] = 1.0
     feats[f"track_temp::{track}"] = temp_norm
+    feats[f"driver_track::{strategy['driver_id']}::{track}"] = 1.0
+    feats[f"driver_temp_bin::{strategy['driver_id']}::{tbin}"] = 1.0
 
     stop_map = {int(stop["lap"]): stop["to_tire"] for stop in pit_stops}
 
@@ -126,6 +134,8 @@ def evaluate_exact(data, w):
 def tunable_feature(name):
     if name.startswith("driver::"):
         return False
+    if name.startswith("driver_track::") or name.startswith("driver_temp_bin::"):
+        return True
     if name in ("pit_count", "pit_lane_time", "last_stint_len"):
         return True
     if name.startswith("last_stint_"):
