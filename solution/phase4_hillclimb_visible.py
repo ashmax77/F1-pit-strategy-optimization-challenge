@@ -18,6 +18,11 @@ def _temp_bin(track_temp):
     return max(15, min(45, (t // 3) * 3))
 
 
+def _ratio_bucket(value, bucket_count):
+    clipped = max(0.0, min(0.999999, float(value)))
+    return min(bucket_count - 1, int(clipped * bucket_count))
+
+
 def extract_feature_map(strategy, race_config, config):
     temp_scale = float(config.get("temp_scale", 15.0))
     age_bucket_cap = int(config.get("age_bucket_cap", 50))
@@ -52,10 +57,19 @@ def extract_feature_map(strategy, race_config, config):
     last_tire = pit_stops[-1]["to_tire"] if pit_stops else strategy["starting_tire"]
     last_stint_len = total_laps - last_stop_lap
     last_stint_phase = _phase_bucket(max(1, last_stop_lap + 1), total_laps, progress_buckets)
+    last_stop_ratio = float(last_stop_lap) / max(1, total_laps)
+    last_stint_ratio = float(last_stint_len) / max(1, total_laps)
+    last_stop_bucket = _ratio_bucket(last_stop_ratio, 10)
+    last_stint_bucket = _ratio_bucket(last_stint_ratio, 10)
     feats["last_stint_len"] = float(last_stint_len)
     feats[f"last_stint_tire::{last_tire}"] = 1.0
     feats[f"last_stint_phase::{last_stint_phase}"] = 1.0
     feats[f"last_stint_temp::{last_tire}"] = temp_norm * last_stint_len
+    feats[f"last_stop_bin::{last_stop_bucket}"] = 1.0
+    feats[f"last_stint_bin::{last_stint_bucket}"] = 1.0
+    feats[f"final_tire_track::{track}::{last_tire}"] = 1.0
+    feats[f"final_tire_stopbin::{last_tire}::{last_stop_bucket}"] = 1.0
+    feats[f"track_last_stop::{track}::{last_stop_bucket}"] = 1.0
 
     current_tire = strategy["starting_tire"]
     tire_age = 0
@@ -136,6 +150,12 @@ def tunable_feature(name):
         return False
     if name.startswith("driver_track::") or name.startswith("driver_temp_bin::"):
         return True
+    if name.startswith("last_stop_bin::") or name.startswith("last_stint_bin::"):
+        return True
+    if name.startswith("final_tire_track::") or name.startswith("final_tire_stopbin::"):
+        return True
+    if name.startswith("track_last_stop::"):
+        return True
     if name in ("pit_count", "pit_lane_time", "last_stint_len"):
         return True
     if name.startswith("last_stint_"):
@@ -184,6 +204,7 @@ def main():
     print(json.dumps({"start_passed": best, "total": 100, "feature_count": len(names)}))
 
     tunable = [i for i, n in enumerate(names) if tunable_feature(n)]
+    targeted = [i for i, n in enumerate(names) if n.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::"))]
     rng = random.Random(args.seed)
 
     iterations = int(args.iterations)
@@ -191,6 +212,10 @@ def main():
         cand = list(best_w)
         k = rng.randint(8, 26)
         picks = rng.sample(tunable, k=min(k, len(tunable)))
+        if targeted:
+            bonus_k = min(len(targeted), rng.randint(3, 8))
+            picks.extend(rng.sample(targeted, k=bonus_k))
+            picks = list(dict.fromkeys(picks))
 
         step_mul = 0.10 if t < 120 else (0.06 if t < 240 else 0.03)
         step_add = 0.015 if t < 120 else (0.008 if t < 240 else 0.004)
@@ -198,7 +223,10 @@ def main():
         for i in picks:
             scale = 1.0 + rng.uniform(-step_mul, step_mul)
             cand[i] *= scale
-            cand[i] += rng.uniform(-step_add, step_add)
+            add = rng.uniform(-step_add, step_add)
+            if i in targeted:
+                add *= 2.0
+            cand[i] += add
 
         score = evaluate_exact(data, cand)
         if score >= best:

@@ -26,6 +26,11 @@ def _temp_bin(track_temp):
     return max(15, min(45, (t // 3) * 3))
 
 
+def _ratio_bucket(value, bucket_count):
+    clipped = max(0.0, min(0.999999, float(value)))
+    return min(bucket_count - 1, int(clipped * bucket_count))
+
+
 def _build_age_index_groups(feature_names):
     groups = {
         "lap": {"SOFT": [], "MEDIUM": [], "HARD": []},
@@ -128,10 +133,19 @@ def extract_features(strategy, race_config, config):
     last_tire = pit_stops[-1]["to_tire"] if pit_stops else strategy["starting_tire"]
     last_stint_len = total_laps - last_stop_lap
     last_stint_phase = _phase_bucket(max(1, last_stop_lap + 1), total_laps, progress_buckets)
+    last_stop_ratio = float(last_stop_lap) / max(1, total_laps)
+    last_stint_ratio = float(last_stint_len) / max(1, total_laps)
+    last_stop_bucket = _ratio_bucket(last_stop_ratio, 10)
+    last_stint_bucket = _ratio_bucket(last_stint_ratio, 10)
     feats["last_stint_len"] = float(last_stint_len)
     feats[f"last_stint_tire::{last_tire}"] = 1.0
     feats[f"last_stint_phase::{last_stint_phase}"] = 1.0
     feats[f"last_stint_temp::{last_tire}"] = temp_norm * last_stint_len
+    feats[f"last_stop_bin::{last_stop_bucket}"] = 1.0
+    feats[f"last_stint_bin::{last_stint_bucket}"] = 1.0
+    feats[f"final_tire_track::{track}::{last_tire}"] = 1.0
+    feats[f"final_tire_stopbin::{last_tire}::{last_stop_bucket}"] = 1.0
+    feats[f"track_last_stop::{track}::{last_stop_bucket}"] = 1.0
 
     feats["pit_count"] = float(len(pit_stops))
     feats["pit_lane_time"] = float(race_config["pit_lane_time"]) * len(pit_stops)

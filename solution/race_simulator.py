@@ -23,6 +23,11 @@ def _temp_bin(track_temp):
     return max(15, min(45, (t // 3) * 3))
 
 
+def _ratio_bucket(value, bucket_count):
+    clipped = max(0.0, min(0.999999, float(value)))
+    return min(bucket_count - 1, int(clipped * bucket_count))
+
+
 def _default_model():
     return {
         "mechanistic_params": {
@@ -115,6 +120,13 @@ def _driver_relative_time_legacy(strategy, race_config, model):
     race_len = float(total_laps) if total_laps > 0 else 1.0
     last_stop_ratio = float(last_stop_lap) / race_len
     last_stint_ratio = float(last_stint_len) / race_len
+    last_stop_bucket = _ratio_bucket(last_stop_ratio, 10)
+    last_stint_bucket = _ratio_bucket(last_stint_ratio, 10)
+    relative_time += weights.get(f"last_stop_bin::{last_stop_bucket}", 0.0)
+    relative_time += weights.get(f"last_stint_bin::{last_stint_bucket}", 0.0)
+    relative_time += weights.get(f"final_tire_track::{track}::{last_tire}", 0.0)
+    relative_time += weights.get(f"final_tire_stopbin::{last_tire}::{last_stop_bucket}", 0.0)
+    relative_time += weights.get(f"track_last_stop::{track}::{last_stop_bucket}", 0.0)
     late_hinge = float(metadata.get("late_stop_hinge", 0.65))
     early_hinge = float(metadata.get("early_stop_hinge", 0.12))
     short_hinge = float(metadata.get("short_last_stint_hinge", 0.16))
