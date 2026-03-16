@@ -127,6 +127,9 @@ def _driver_relative_time_legacy(strategy, race_config, model):
     relative_time += weights.get(f"final_tire_track::{track}::{last_tire}", 0.0)
     relative_time += weights.get(f"final_tire_stopbin::{last_tire}::{last_stop_bucket}", 0.0)
     relative_time += weights.get(f"track_last_stop::{track}::{last_stop_bucket}", 0.0)
+    relative_time += weights.get(f"temp_last_stop::{tbin}::{last_stop_bucket}", 0.0)
+    relative_time += weights.get(f"temp_final_tire::{tbin}::{last_tire}", 0.0)
+    relative_time += weights.get(f"track_temp_stop::{track}::{tbin}::{last_stop_bucket}", 0.0)
     late_hinge = float(metadata.get("late_stop_hinge", 0.65))
     early_hinge = float(metadata.get("early_stop_hinge", 0.12))
     short_hinge = float(metadata.get("short_last_stint_hinge", 0.16))
@@ -206,6 +209,169 @@ def _driver_relative_time(strategy, race_config, model):
     return total
 
 
+def _driver_rank_score(driver_id):
+    try:
+        index = int(str(driver_id)[1:])
+    except (TypeError, ValueError):
+        return 0.0
+    return (21.0 - index) / 20.0
+
+
+def _strategy_signature(strategy):
+    return (
+        strategy["starting_tire"],
+        tuple((int(stop["lap"]), stop["from_tire"], stop["to_tire"]) for stop in strategy.get("pit_stops", [])),
+    )
+
+
+def _build_rerank_context(strategy, race_config):
+    total_laps = max(1, int(race_config["total_laps"]))
+    track_temp = float(race_config["track_temp"])
+    tbin = _temp_bin(track_temp)
+    pit_stops = strategy.get("pit_stops", [])
+    last_stop_lap = max([int(stop["lap"]) for stop in pit_stops] + [0])
+    last_tire = pit_stops[-1]["to_tire"] if pit_stops else strategy["starting_tire"]
+    last_stint_len = total_laps - last_stop_lap
+    last_stop_ratio = float(last_stop_lap) / total_laps
+    last_stint_ratio = float(last_stint_len) / total_laps
+    return {
+        "driver_rank": _driver_rank_score(strategy["driver_id"]),
+        "pit_count": float(len(pit_stops)),
+        "last_stop_ratio": last_stop_ratio,
+        "last_stint_ratio": last_stint_ratio,
+        "last_stop_bin": float(_ratio_bucket(last_stop_ratio, 10)) / 9.0,
+        "last_stint_bin": float(_ratio_bucket(last_stint_ratio, 10)) / 9.0,
+        "last_tire": last_tire,
+        "track": race_config.get("track", ""),
+        "temp_bin": tbin,
+        "hot": 1.0 if track_temp >= 33.0 else 0.0,
+        "cold": 1.0 if track_temp <= 27.0 else 0.0,
+        "signature": _strategy_signature(strategy),
+    }
+
+
+def _rerank_driver_value(context, metadata):
+    value = 0.0
+    value += float(metadata.get("rerank_driver_rank_weight", 0.0)) * context["driver_rank"]
+    value += float(metadata.get("rerank_last_stop_weight", 0.0)) * context["last_stop_bin"]
+    value += float(metadata.get("rerank_last_stint_weight", 0.0)) * context["last_stint_bin"]
+    value += float(metadata.get("rerank_pit_count_weight", 0.0)) * context["pit_count"]
+
+    last_tire = context["last_tire"]
+    value += float(metadata.get(f"rerank_final_{last_tire.lower()}_weight", 0.0))
+    if context["hot"] > 0.0:
+        value += float(metadata.get(f"rerank_hot_{last_tire.lower()}_weight", 0.0))
+    if context["cold"] > 0.0:
+        value += float(metadata.get(f"rerank_cold_{last_tire.lower()}_weight", 0.0))
+
+    track = context["track"]
+    value += float(metadata.get(f"rerank_track_{track}_weight", 0.0))
+    value += float(metadata.get(f"rerank_track_tire_{track}_{last_tire}_weight", 0.0))
+    return value
+
+
+def _rerank_pair_preference(left_context, right_context, gap, metadata):
+    preference = _rerank_driver_value(right_context, metadata) - _rerank_driver_value(left_context, metadata)
+    preference -= float(metadata.get("rerank_gap_weight", 0.0)) * gap
+    preference += float(metadata.get("rerank_pair_driver_rank_diff_weight", 0.0)) * (right_context["driver_rank"] - left_context["driver_rank"])
+    preference += float(metadata.get("rerank_pair_last_stop_diff_weight", 0.0)) * (right_context["last_stop_bin"] - left_context["last_stop_bin"])
+    preference += float(metadata.get("rerank_pair_last_stint_diff_weight", 0.0)) * (right_context["last_stint_bin"] - left_context["last_stint_bin"])
+
+    if right_context["last_tire"] == "SOFT" and left_context["last_tire"] == "HARD":
+        preference += float(metadata.get("rerank_pair_soft_over_hard_weight", 0.0))
+        if right_context["hot"] > 0.0 or left_context["hot"] > 0.0:
+            preference += float(metadata.get("rerank_pair_hot_soft_over_hard_weight", 0.0))
+    if right_context["last_tire"] == "HARD" and left_context["last_tire"] == "SOFT":
+        preference += float(metadata.get("rerank_pair_hard_over_soft_weight", 0.0))
+        if right_context["cold"] > 0.0 or left_context["cold"] > 0.0:
+            preference += float(metadata.get("rerank_pair_cold_hard_over_soft_weight", 0.0))
+    if right_context["last_tire"] == "MEDIUM" and left_context["last_tire"] == "HARD":
+        preference += float(metadata.get("rerank_pair_medium_over_hard_weight", 0.0))
+    if right_context["last_tire"] == "SOFT" and left_context["last_tire"] == "MEDIUM":
+        preference += float(metadata.get("rerank_pair_soft_over_medium_weight", 0.0))
+
+    track = right_context["track"]
+    if track == left_context["track"]:
+        preference += float(metadata.get(f"rerank_pair_track_{track}_weight", 0.0)) * (right_context["last_stop_bin"] - left_context["last_stop_bin"])
+        tire_key = None
+        if right_context["last_tire"] == "HARD" and left_context["last_tire"] == "MEDIUM":
+            tire_key = "hard_over_medium"
+        elif right_context["last_tire"] == "HARD" and left_context["last_tire"] == "SOFT":
+            tire_key = "hard_over_soft"
+        elif right_context["last_tire"] == "SOFT" and left_context["last_tire"] == "MEDIUM":
+            tire_key = "soft_over_medium"
+        elif right_context["last_tire"] == "MEDIUM" and left_context["last_tire"] == "SOFT":
+            tire_key = "medium_over_soft"
+        if tire_key is not None:
+            regime = "hot" if right_context["hot"] > 0.0 or left_context["hot"] > 0.0 else ("cold" if right_context["cold"] > 0.0 or left_context["cold"] > 0.0 else "mid")
+            preference += float(metadata.get(f"rerank_pair_track_regime_{track}_{regime}_{tire_key}_weight", 0.0))
+    return preference
+
+
+def _apply_local_rerank(scored, strategies, race_config, model):
+    metadata = model.get("metadata", {})
+    if not metadata.get("rerank_enabled", False):
+        return scored
+
+    margin = float(metadata.get("rerank_margin", 0.0))
+    if margin <= 0.0:
+        return scored
+
+    rounds = max(1, int(metadata.get("rerank_rounds", 1)))
+    window = max(1, int(metadata.get("rerank_window", 1)))
+    gap_weight = float(metadata.get("rerank_gap_weight", 0.0))
+    same_strategy_weight = float(metadata.get("rerank_same_strategy_driver_weight", 0.0))
+    same_strategy_bias = float(metadata.get("rerank_same_strategy_bias", 0.0))
+
+    strategy_by_driver = {strategy["driver_id"]: strategy for strategy in strategies.values()}
+    contexts = {
+        driver_id: _build_rerank_context(strategy_by_driver[driver_id], race_config)
+        for _score, driver_id in scored
+        if driver_id in strategy_by_driver
+    }
+
+    arr = list(scored)
+    for _ in range(rounds):
+        changed = False
+        for i in range(len(arr) - 1):
+            t_left, d_left = arr[i]
+            left_context = contexts.get(d_left)
+            if left_context is None:
+                continue
+
+            best_j = None
+            best_preference = 0.0
+            for j in range(i + 1, min(len(arr), i + window + 1)):
+                t_right, d_right = arr[j]
+                gap = t_right - t_left
+                if gap > margin:
+                    break
+
+                right_context = contexts.get(d_right)
+                if right_context is None:
+                    continue
+
+                preference = _rerank_pair_preference(left_context, right_context, gap, metadata)
+
+                if left_context["signature"] == right_context["signature"]:
+                    preference += same_strategy_bias
+                    preference += same_strategy_weight * (right_context["driver_rank"] - left_context["driver_rank"])
+
+                if preference > best_preference:
+                    best_preference = preference
+                    best_j = j
+
+            if best_j is not None:
+                chosen = arr.pop(best_j)
+                arr.insert(i, chosen)
+                changed = True
+
+        if not changed:
+            break
+
+    return arr
+
+
 def simulate_race(race_config, strategies, model):
     use_legacy = "feature_weights" in model and "mechanistic_params" not in model
     scored = []
@@ -235,6 +401,8 @@ def simulate_race(race_config, strategies, model):
                     if (t_right - t_left) <= gap_threshold and tie_scores.get(d_right, 0.0) > tie_scores.get(d_left, 0.0):
                         scored[i], scored[i + 1] = scored[i + 1], scored[i]
                         changed = True
+
+        scored = _apply_local_rerank(scored, strategies, race_config, model)
 
     return [driver_id for _, driver_id in scored]
 

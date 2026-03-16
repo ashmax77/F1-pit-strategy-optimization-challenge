@@ -70,6 +70,9 @@ def extract_feature_map(strategy, race_config, config):
     feats[f"final_tire_track::{track}::{last_tire}"] = 1.0
     feats[f"final_tire_stopbin::{last_tire}::{last_stop_bucket}"] = 1.0
     feats[f"track_last_stop::{track}::{last_stop_bucket}"] = 1.0
+    feats[f"temp_last_stop::{tbin}::{last_stop_bucket}"] = 1.0
+    feats[f"temp_final_tire::{tbin}::{last_tire}"] = 1.0
+    feats[f"track_temp_stop::{track}::{tbin}::{last_stop_bucket}"] = 1.0
 
     current_tire = strategy["starting_tire"]
     tire_age = 0
@@ -156,6 +159,10 @@ def tunable_feature(name):
         return True
     if name.startswith("track_last_stop::"):
         return True
+    if name.startswith("temp_last_stop::") or name.startswith("temp_final_tire::"):
+        return True
+    if name.startswith("track_temp_stop::"):
+        return True
     if name in ("pit_count", "pit_lane_time", "last_stint_len"):
         return True
     if name.startswith("last_stint_"):
@@ -179,10 +186,13 @@ def main():
     parser = argparse.ArgumentParser(description="Phase 4 bounded hill-climb on visible set")
     parser.add_argument("--iterations", type=int, default=350)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--save-elites", action="store_true")
+    parser.add_argument("--top-impact-k", type=int, default=0)
     args = parser.parse_args()
 
     repo = Path(__file__).resolve().parents[1]
     model_path = repo / "solution" / "model_params.json"
+    elite_dir = repo / "solution" / "elites"
     model = json.loads(model_path.read_text(encoding="utf-8"))
 
     if "feature_weights" not in model:
@@ -204,7 +214,22 @@ def main():
     print(json.dumps({"start_passed": best, "total": 100, "feature_count": len(names)}))
 
     tunable = [i for i, n in enumerate(names) if tunable_feature(n)]
-    targeted = [i for i, n in enumerate(names) if n.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::"))]
+    targeted = [i for i, n in enumerate(names) if n.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::"))]
+
+    if args.top_impact_k and args.top_impact_k > 0:
+        def impact_score(i):
+            name = names[i]
+            base_abs = abs(base[i])
+            # Prioritize currently strong coefficients and late-phase targeted families.
+            fam_boost = 1.0
+            if name.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::", "late::", "late_temp::")):
+                fam_boost = 1.6
+            return base_abs * fam_boost
+
+        ranked = sorted(tunable, key=impact_score, reverse=True)
+        k = min(len(ranked), int(args.top_impact_k))
+        tunable = ranked[:k]
+        targeted = [i for i in targeted if i in set(tunable)]
     rng = random.Random(args.seed)
 
     iterations = int(args.iterations)
@@ -236,6 +261,21 @@ def main():
                 if score > best:
                     best = score
                     print(json.dumps({"iter": t, "passed": best, "total": 100}))
+                    if args.save_elites:
+                        elite_dir.mkdir(parents=True, exist_ok=True)
+                        elite_model = deepcopy(model)
+                        elite_fw = deepcopy(fw)
+                        for n, ii in idx.items():
+                            if abs(best_w[ii]) > 1e-12:
+                                elite_fw[n] = float(best_w[ii])
+                        elite_model["feature_weights"] = elite_fw
+                        elite_meta = elite_model.setdefault("metadata", {})
+                        elite_meta["elite_saved_from"] = "phase4_hillclimb_visible"
+                        elite_meta["elite_passed"] = best
+                        elite_meta["elite_iter"] = t
+                        elite_meta["elite_seed"] = args.seed
+                        elite_name = f"model_params_visible_best_{best:02d}_seed_{args.seed}_iter_{t}.json"
+                        (elite_dir / elite_name).write_text(json.dumps(elite_model, indent=2), encoding="utf-8")
 
     if best > evaluate_exact(data, base):
         new_fw = deepcopy(fw)

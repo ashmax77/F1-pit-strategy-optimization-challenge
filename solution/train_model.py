@@ -146,6 +146,9 @@ def extract_features(strategy, race_config, config):
     feats[f"final_tire_track::{track}::{last_tire}"] = 1.0
     feats[f"final_tire_stopbin::{last_tire}::{last_stop_bucket}"] = 1.0
     feats[f"track_last_stop::{track}::{last_stop_bucket}"] = 1.0
+    feats[f"temp_last_stop::{tbin}::{last_stop_bucket}"] = 1.0
+    feats[f"temp_final_tire::{tbin}::{last_tire}"] = 1.0
+    feats[f"track_temp_stop::{track}::{tbin}::{last_stop_bucket}"] = 1.0
 
     feats["pit_count"] = float(len(pit_stops))
     feats["pit_lane_time"] = float(race_config["pit_lane_time"]) * len(pit_stops)
