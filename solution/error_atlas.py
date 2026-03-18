@@ -13,9 +13,7 @@ def strategy_signature(strategy):
 
 
 def get_driver_score(race_config, strategy, model):
-    if "mechanistic_params" in model:
-        return race_simulator._driver_relative_time(strategy, race_config, model)
-    return race_simulator._driver_relative_time_legacy(strategy, race_config, model)
+    return race_simulator._driver_relative_time(strategy, race_config, model)
 
 
 def classify_race_failure(case_data, expected, predicted, model):
@@ -100,11 +98,7 @@ def main():
         name = f"test_{i:03d}.json"
         case_data = json.loads((inputs_dir / name).read_text(encoding="utf-8"))
         expected = json.loads((expected_dir / name).read_text(encoding="utf-8"))["finishing_positions"]
-        predicted = None
-        if race_simulator.use_expected_cache():
-            predicted = race_simulator._load_known_expected_output(case_data.get("race_id"))
-        if predicted is None:
-            predicted = race_simulator.simulate_race(case_data["race_config"], case_data["strategies"], model)
+        predicted = race_simulator.simulate_race(case_data["race_config"], case_data["strategies"], model)
         ok = predicted == expected
         race_rows.append({"race_id": case_data["race_id"], "ok": ok})
         if not ok:
