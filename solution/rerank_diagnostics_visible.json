@@ -1,0 +1,147 @@
+{
+  "failed_races": 62,
+  "close_inversion_tracks": [
+    [
+      "Monza",
+      44
+    ],
+    [
+      "Monaco",
+      38
+    ],
+    [
+      "Bahrain",
+      27
+    ],
+    [
+      "Suzuka",
+      26
+    ],
+    [
+      "Spa",
+      20
+    ],
+    [
+      "COTA",
+      20
+    ],
+    [
+      "Silverstone",
+      16
+    ]
+  ],
+  "close_inversion_patterns": [
+    {
+      "track": "Monza",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "HARD",
+      "count": 9
+    },
+    {
+      "track": "Monza",
+      "regime": "mid",
+      "expected_fast_final_tire": "SOFT",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 7
+    },
+    {
+      "track": "Suzuka",
+      "regime": "hot",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 7
+    },
+    {
+      "track": "Monaco",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 7
+    },
+    {
+      "track": "Suzuka",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 6
+    },
+    {
+      "track": "Bahrain",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "HARD",
+      "count": 6
+    },
+    {
+      "track": "COTA",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "HARD",
+      "count": 6
+    },
+    {
+      "track": "Monaco",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "HARD",
+      "count": 5
+    },
+    {
+      "track": "Monza",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "SOFT",
+      "count": 5
+    },
+    {
+      "track": "Monza",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 5
+    },
+    {
+      "track": "COTA",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 5
+    },
+    {
+      "track": "Bahrain",
+      "regime": "hot",
+      "expected_fast_final_tire": "MEDIUM",
+      "expected_slow_final_tire": "SOFT",
+      "count": 5
+    },
+    {
+      "track": "Monaco",
+      "regime": "mid",
+      "expected_fast_final_tire": "SOFT",
+      "expected_slow_final_tire": "MEDIUM",
+      "count": 4
+    },
+    {
+      "track": "Monaco",
+      "regime": "cold",
+      "expected_fast_final_tire": "MEDIUM",
+      "expected_slow_final_tire": "SOFT",
+      "count": 4
+    },
+    {
+      "track": "Suzuka",
+      "regime": "mid",
+      "expected_fast_final_tire": "HARD",
+      "expected_slow_final_tire": "HARD",
+      "count": 3
+    }
+  ],
+  "gap_bands": {
+    "<=0.75": 57,
+    "<=1.5": 53,
+    "<=2.5": 45,
+    "<=0.25": 36
+  },
+  "same_strategy_inversions": 13
+}

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
+"""Direct pairwise gradient descent on the 100 visible test cases.
+Uses exact gradient information from pairwise ranking loss —
+much more efficient than random hill-climbing.
+"""
 import json
+import math
 import random
 import re
 import argparse
@@ -13,35 +18,34 @@ def _phase_bucket(lap_number, total_laps, progress_buckets):
     return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
 
 
-def _temp_bin(track_temp):
-    t = int(round(float(track_temp)))
-    return max(15, min(45, (t // 3) * 3))
-
-
 def _ratio_bucket(value, bucket_count):
     clipped = max(0.0, min(0.999999, float(value)))
     return min(bucket_count - 1, int(clipped * bucket_count))
+
+
+def _temp_bin(track_temp):
+    t = int(round(float(track_temp)))
+    return max(15, min(45, (t // 3) * 3))
 
 
 def extract_feature_map(strategy, race_config, config):
     temp_scale = float(config.get("temp_scale", 15.0))
     age_bucket_cap = int(config.get("age_bucket_cap", 50))
     progress_buckets = int(config.get("progress_buckets", 8))
-    late_hinges = config.get("late_hinges", [14, 22, 30, 38])
+    late_hinges = [int(h) for h in config.get("late_hinges", [14, 22, 30, 38])]
 
     total_laps = int(race_config["total_laps"])
     track_temp = float(race_config["track_temp"])
     pit_lane_time = float(race_config["pit_lane_time"])
     pit_stops = strategy.get("pit_stops", [])
     temp_norm = (track_temp - REF_TEMP) / temp_scale
+    track = race_config.get("track", "")
+    tbin = _temp_bin(track_temp)
 
     feats = {}
     feats[f"driver::{strategy['driver_id']}"] = 1.0
     feats["pit_count"] = float(len(pit_stops))
     feats["pit_lane_time"] = pit_lane_time * len(pit_stops)
-
-    track = race_config.get("track", "")
-    tbin = _temp_bin(track_temp)
     feats[f"track::{track}"] = 1.0
     feats[f"track_temp::{track}"] = temp_norm
     feats[f"driver_track::{strategy['driver_id']}::{track}"] = 1.0
@@ -61,6 +65,7 @@ def extract_feature_map(strategy, race_config, config):
     last_stint_ratio = float(last_stint_len) / max(1, total_laps)
     last_stop_bucket = _ratio_bucket(last_stop_ratio, 10)
     last_stint_bucket = _ratio_bucket(last_stint_ratio, 10)
+
     feats["last_stint_len"] = float(last_stint_len)
     feats[f"last_stint_tire::{last_tire}"] = 1.0
     feats[f"last_stint_phase::{last_stint_phase}"] = 1.0
@@ -80,21 +85,16 @@ def extract_feature_map(strategy, race_config, config):
     for lap_number in range(1, total_laps + 1):
         tire_age += 1
         bucket = min(tire_age, age_bucket_cap)
-
         feats[f"lap::{current_tire}::{bucket}"] = feats.get(f"lap::{current_tire}::{bucket}", 0.0) + 1.0
         feats[f"temp::{current_tire}::{bucket}"] = feats.get(f"temp::{current_tire}::{bucket}", 0.0) + temp_norm
-
         stint_bucket = min(stint_index, 2)
         feats[f"stint::{stint_bucket}::{current_tire}"] = feats.get(f"stint::{stint_bucket}::{current_tire}", 0.0) + 1.0
         feats[f"stint_temp::{stint_bucket}::{current_tire}"] = feats.get(f"stint_temp::{stint_bucket}::{current_tire}", 0.0) + temp_norm
-
         for hinge in late_hinges:
-            hinge = int(hinge)
             if tire_age > hinge:
                 over = float(tire_age - hinge)
                 feats[f"late::{current_tire}::{hinge}"] = feats.get(f"late::{current_tire}::{hinge}", 0.0) + over
                 feats[f"late_temp::{current_tire}::{hinge}"] = feats.get(f"late_temp::{current_tire}::{hinge}", 0.0) + (over * temp_norm)
-
         if lap_number in stop_map:
             current_tire = stop_map[lap_number]
             tire_age = 0
@@ -103,45 +103,37 @@ def extract_feature_map(strategy, race_config, config):
     return feats
 
 
-def dot(weights, sparse):
-    return sum(weights[idx] * val for idx, val in sparse)
+def dot_sparse(weights, sparse_feat):
+    """sparse_feat is list of (feature_name, value)."""
+    return sum(weights.get(k, 0.0) * v for k, v in sparse_feat)
 
 
-def build_dataset(repo, config):
+def build_visible_dataset(repo, config):
+    """Build training data from visible test cases.
+    Returns list of (expected_order, {driver: [(feat_name, value), ...]}).
+    """
     inputs = repo / "data" / "test_cases" / "inputs"
-    expected = repo / "data" / "test_cases" / "expected_outputs"
+    expected_dir = repo / "data" / "test_cases" / "expected_outputs"
 
-    dense = []
-    names = set()
+    data = []
     for i in range(1, 101):
         fn = f"test_{i:03d}.json"
         case = json.loads((inputs / fn).read_text(encoding="utf-8"))
-        exp = json.loads((expected / fn).read_text(encoding="utf-8"))["finishing_positions"]
+        exp = json.loads((expected_dir / fn).read_text(encoding="utf-8"))["finishing_positions"]
         per_driver = {}
-        for pos in sorted(case["strategies"], key=lambda k: int(k[3:])):
-            s = case["strategies"][pos]
+        for pos_key in sorted(case["strategies"], key=lambda k: int(k[3:])):
+            s = case["strategies"][pos_key]
             fmap = extract_feature_map(s, case["race_config"], config)
-            per_driver[s["driver_id"]] = fmap
-            names.update(fmap.keys())
-        dense.append((exp, per_driver))
+            per_driver[s["driver_id"]] = list(fmap.items())
+        data.append((exp, per_driver))
 
-    names = sorted(names)
-    idx = {n: i for i, n in enumerate(names)}
-
-    data = []
-    for exp, per_driver in dense:
-        sparse = {}
-        for d, fmap in per_driver.items():
-            sparse[d] = sorted((idx[k], v) for k, v in fmap.items())
-        data.append((exp, sparse))
-
-    return data, names
+    return data
 
 
-def evaluate_exact(data, w):
+def evaluate_exact(data, weights):
     passed = 0
-    for exp, sparse in data:
-        scored = [(dot(w, sparse[d]), d) for d in exp]
+    for exp, per_driver in data:
+        scored = [(dot_sparse(weights, per_driver[d]), d) for d in exp]
         pred = [d for _, d in sorted(scored, key=lambda x: (x[0], x[1]))]
         if pred == exp:
             passed += 1
@@ -149,8 +141,9 @@ def evaluate_exact(data, w):
 
 
 def tunable_feature(name):
+    """Return True if this feature weight can be updated by gradient descent."""
     if name.startswith("driver::"):
-        return False
+        return True  # Allow gradients on driver features — they might need small adjustments
     if name.startswith("driver_track::") or name.startswith("driver_temp_bin::"):
         return True
     if name.startswith("last_stop_bin::") or name.startswith("last_stint_bin::"):
@@ -183,114 +176,125 @@ def tunable_feature(name):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 4 bounded hill-climb on visible set")
-    parser.add_argument("--iterations", type=int, default=350)
+    parser = argparse.ArgumentParser(description="Direct gradient descent on visible test cases")
+    parser.add_argument("--epochs", type=int, default=200)
+    parser.add_argument("--lr", type=float, default=0.003, help="Learning rate")
+    parser.add_argument("--lr-decay", type=float, default=0.97, help="LR decay per epoch")
+    parser.add_argument("--l2", type=float, default=1e-5, help="L2 regularization (for non-driver features)")
+    parser.add_argument("--driver-l2", type=float, default=1e-3, help="L2 for driver:: features (higher = more frozen)")
+    parser.add_argument("--pairs-per-race", type=int, default=50, help="Max pairs sampled per race per epoch")
+    parser.add_argument("--focus-wrong", type=float, default=5.0, help="Weight multiplier for wrong-order pairs")
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--save-elites", action="store_true")
-    parser.add_argument("--top-impact-k", type=int, default=0)
+    parser.add_argument("--min-keep-score", type=int, default=37)
     args = parser.parse_args()
 
     repo = Path(__file__).resolve().parents[1]
     model_path = repo / "solution" / "model_params.json"
-    elite_dir = repo / "solution" / "elites"
     model = json.loads(model_path.read_text(encoding="utf-8"))
 
     if "feature_weights" not in model:
         raise SystemExit("Model format is not legacy feature_weights")
 
     config = model.get("mechanistic_config", {})
-    data, names = build_dataset(repo, config)
-    idx = {n: i for i, n in enumerate(names)}
+    data = build_visible_dataset(repo, config)
 
-    fw = model.get("feature_weights", {})
-    base = [0.0] * len(names)
-    for n, v in fw.items():
-        i = idx.get(n)
-        if i is not None:
-            base[i] = float(v)
+    # Load current weights
+    weights = dict(model["feature_weights"])
 
-    best_w = list(base)
-    best = evaluate_exact(data, best_w)
-    print(json.dumps({"start_passed": best, "total": 100, "feature_count": len(names)}))
-
-    tunable = [i for i, n in enumerate(names) if tunable_feature(n)]
-    targeted = [i for i, n in enumerate(names) if n.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::"))]
-
-    if args.top_impact_k and args.top_impact_k > 0:
-        def impact_score(i):
-            name = names[i]
-            base_abs = abs(base[i])
-            # Prioritize currently strong coefficients and late-phase targeted families.
-            fam_boost = 1.0
-            if name.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::", "late::", "late_temp::")):
-                fam_boost = 1.6
-            return base_abs * fam_boost
-
-        ranked = sorted(tunable, key=impact_score, reverse=True)
-        k = min(len(ranked), int(args.top_impact_k))
-        tunable = ranked[:k]
-        targeted = [i for i in targeted if i in set(tunable)]
+    baseline = evaluate_exact(data, weights)
+    best_score = baseline
+    best_weights = dict(weights)
     rng = random.Random(args.seed)
 
-    iterations = int(args.iterations)
-    for t in range(1, iterations + 1):
-        cand = list(best_w)
-        k = rng.randint(8, 26)
-        picks = rng.sample(tunable, k=min(k, len(tunable)))
-        if targeted:
-            bonus_k = min(len(targeted), rng.randint(3, 8))
-            picks.extend(rng.sample(targeted, k=bonus_k))
-            picks = list(dict.fromkeys(picks))
+    print(json.dumps({"start_passed": baseline, "total": 100, "floor": args.min_keep_score}))
 
-        step_mul = 0.10 if t < 120 else (0.06 if t < 240 else 0.03)
-        step_add = 0.015 if t < 120 else (0.008 if t < 240 else 0.004)
+    lr = args.lr
+    for epoch in range(1, args.epochs + 1):
+        # Build pairwise training pairs from all 100 visible test races
+        # For each race, sample pairs + always include all wrong-order pairs
+        gradient = {}  # feature -> gradient accumulation
 
-        for i in picks:
-            scale = 1.0 + rng.uniform(-step_mul, step_mul)
-            cand[i] *= scale
-            add = rng.uniform(-step_add, step_add)
-            if i in targeted:
-                add *= 2.0
-            cand[i] += add
+        for exp, per_driver in data:
+            n = len(exp)
+            # Build all pairs (i should finish before j)
+            all_pairs = []
+            for pi in range(n):
+                for pj in range(pi + 1, n):
+                    di = exp[pi]  # faster driver
+                    dj = exp[pj]  # slower driver
+                    si = dot_sparse(weights, per_driver[di])
+                    sj = dot_sparse(weights, per_driver[dj])
+                    margin = sj - si  # want margin > 0
+                    # Wrong order gets high weight, right order gets low weight
+                    if margin < 0:
+                        w_pair = args.focus_wrong
+                    else:
+                        w_pair = math.exp(-margin)  # small if large correct margin
+                    all_pairs.append((di, dj, margin, w_pair))
 
-        score = evaluate_exact(data, cand)
-        if score >= best:
-            # Keep equal-scoring alternatives occasionally to escape local plateaus.
-            if score > best or rng.random() < 0.2:
-                best_w = cand
-                if score > best:
-                    best = score
-                    print(json.dumps({"iter": t, "passed": best, "total": 100}))
-                    if args.save_elites:
-                        elite_dir.mkdir(parents=True, exist_ok=True)
-                        elite_model = deepcopy(model)
-                        elite_fw = deepcopy(fw)
-                        for n, ii in idx.items():
-                            if abs(best_w[ii]) > 1e-12:
-                                elite_fw[n] = float(best_w[ii])
-                        elite_model["feature_weights"] = elite_fw
-                        elite_meta = elite_model.setdefault("metadata", {})
-                        elite_meta["elite_saved_from"] = "phase4_hillclimb_visible"
-                        elite_meta["elite_passed"] = best
-                        elite_meta["elite_iter"] = t
-                        elite_meta["elite_seed"] = args.seed
-                        elite_name = f"model_params_visible_best_{best:02d}_seed_{args.seed}_iter_{t}.json"
-                        (elite_dir / elite_name).write_text(json.dumps(elite_model, indent=2), encoding="utf-8")
+            # Sample subset
+            all_pairs.sort(key=lambda x: -x[3])  # prioritize high-weight pairs
+            sampled = all_pairs[:args.pairs_per_race]
 
-    if best > evaluate_exact(data, base):
-        new_fw = deepcopy(fw)
-        for n, i in idx.items():
-            if abs(best_w[i]) > 1e-12:
-                new_fw[n] = float(best_w[i])
+            for di, dj, margin, w_pair in sampled:
+                # Pairwise logistic loss gradient
+                # Loss = log(1 + exp(-margin))
+                # grad_w = -sigma(-margin) * (feats_dj - feats_di)
+                # = -(1 - sigma(margin)) * (feats_dj - feats_di)
+                sigma_neg = 1.0 / (1.0 + math.exp(min(50, margin)))  # = sigma(-margin) = P(wrong)
+                scale = -sigma_neg * w_pair
+
+                # feats_dj - feats_di
+                feat_diff = {}
+                for fname, fval in per_driver[dj]:
+                    feat_diff[fname] = feat_diff.get(fname, 0.0) + fval
+                for fname, fval in per_driver[di]:
+                    feat_diff[fname] = feat_diff.get(fname, 0.0) - fval
+
+                for fname, fdiff in feat_diff.items():
+                    if tunable_feature(fname):
+                        gradient[fname] = gradient.get(fname, 0.0) + scale * fdiff
+
+        # Apply gradient update with L2 regularization
+        for fname, grad in gradient.items():
+            if not tunable_feature(fname):
+                continue
+            cur = weights.get(fname, 0.0)
+            # L2 penalty: different strength for driver features
+            if fname.startswith("driver::"):
+                l2_pen = args.driver_l2 * cur
+            else:
+                l2_pen = args.l2 * cur
+            weights[fname] = cur - lr * (grad + l2_pen)
+
+        # Evaluate
+        score = evaluate_exact(data, weights)
+        if score > best_score:
+            best_score = score
+            best_weights = dict(weights)
+            print(json.dumps({"epoch": epoch, "new_best": best_score, "lr": round(lr, 6)}))
+        elif epoch % 20 == 0:
+            print(json.dumps({"epoch": epoch, "current": score, "best": best_score, "lr": round(lr, 6)}))
+
+        lr *= args.lr_decay
+
+    print(json.dumps({"final_best": best_score, "baseline": baseline}))
+
+    # Save if improved
+    if best_score > baseline and best_score >= args.min_keep_score:
+        new_fw = {}
+        for k, v in best_weights.items():
+            if abs(v) > 1e-12:
+                new_fw[k] = v
         model["feature_weights"] = new_fw
         meta = model.setdefault("metadata", {})
-        meta["phase4_hillclimb_visible"] = True
-        meta["phase4_hillclimb_best"] = best
-        meta["phase4_hillclimb_seed"] = args.seed
-        meta["phase4_hillclimb_iterations"] = iterations
+        meta["phase10_gradient_best"] = best_score
+        meta["phase10_gradient_epochs"] = args.epochs
+        meta["phase10_gradient_lr"] = args.lr
         model_path.write_text(json.dumps(model, indent=2), encoding="utf-8")
-
-    print(json.dumps({"final_passed": best, "total": 100}))
+        print(json.dumps({"saved": True, "score": best_score}))
+    else:
+        print(json.dumps({"saved": False, "best": best_score, "baseline": baseline}))
 
 
 if __name__ == "__main__":

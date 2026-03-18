@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
+"""Simulated annealing optimizer for race simulator feature weights.
+Unlike pure hill-climbing, SA can escape local optima by occasionally
+accepting worse states with probability exp(-delta/T).
+"""
 import json
+import math
 import random
 import re
 import argparse
@@ -13,21 +18,21 @@ def _phase_bucket(lap_number, total_laps, progress_buckets):
     return min(progress_buckets - 1, ((lap_number - 1) * progress_buckets) // total_laps)
 
 
-def _temp_bin(track_temp):
-    t = int(round(float(track_temp)))
-    return max(15, min(45, (t // 3) * 3))
-
-
 def _ratio_bucket(value, bucket_count):
     clipped = max(0.0, min(0.999999, float(value)))
     return min(bucket_count - 1, int(clipped * bucket_count))
+
+
+def _temp_bin(track_temp):
+    t = int(round(float(track_temp)))
+    return max(15, min(45, (t // 3) * 3))
 
 
 def extract_feature_map(strategy, race_config, config):
     temp_scale = float(config.get("temp_scale", 15.0))
     age_bucket_cap = int(config.get("age_bucket_cap", 50))
     progress_buckets = int(config.get("progress_buckets", 8))
-    late_hinges = config.get("late_hinges", [14, 22, 30, 38])
+    late_hinges = [int(h) for h in config.get("late_hinges", [14, 22, 30, 38])]
 
     total_laps = int(race_config["total_laps"])
     track_temp = float(race_config["track_temp"])
@@ -35,13 +40,14 @@ def extract_feature_map(strategy, race_config, config):
     pit_stops = strategy.get("pit_stops", [])
     temp_norm = (track_temp - REF_TEMP) / temp_scale
 
+    track = race_config.get("track", "")
+    tbin = _temp_bin(track_temp)
+
     feats = {}
     feats[f"driver::{strategy['driver_id']}"] = 1.0
     feats["pit_count"] = float(len(pit_stops))
     feats["pit_lane_time"] = pit_lane_time * len(pit_stops)
 
-    track = race_config.get("track", "")
-    tbin = _temp_bin(track_temp)
     feats[f"track::{track}"] = 1.0
     feats[f"track_temp::{track}"] = temp_norm
     feats[f"driver_track::{strategy['driver_id']}::{track}"] = 1.0
@@ -61,6 +67,7 @@ def extract_feature_map(strategy, race_config, config):
     last_stint_ratio = float(last_stint_len) / max(1, total_laps)
     last_stop_bucket = _ratio_bucket(last_stop_ratio, 10)
     last_stint_bucket = _ratio_bucket(last_stint_ratio, 10)
+
     feats["last_stint_len"] = float(last_stint_len)
     feats[f"last_stint_tire::{last_tire}"] = 1.0
     feats[f"last_stint_phase::{last_stint_phase}"] = 1.0
@@ -89,7 +96,6 @@ def extract_feature_map(strategy, race_config, config):
         feats[f"stint_temp::{stint_bucket}::{current_tire}"] = feats.get(f"stint_temp::{stint_bucket}::{current_tire}", 0.0) + temp_norm
 
         for hinge in late_hinges:
-            hinge = int(hinge)
             if tire_age > hinge:
                 over = float(tire_age - hinge)
                 feats[f"late::{current_tire}::{hinge}"] = feats.get(f"late::{current_tire}::{hinge}", 0.0) + over
@@ -183,16 +189,18 @@ def tunable_feature(name):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Phase 4 bounded hill-climb on visible set")
-    parser.add_argument("--iterations", type=int, default=350)
+    parser = argparse.ArgumentParser(description="Simulated annealing optimizer for feature weights")
+    parser.add_argument("--iterations", type=int, default=2000)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--save-elites", action="store_true")
-    parser.add_argument("--top-impact-k", type=int, default=0)
+    parser.add_argument("--t0", type=float, default=2.0, help="Initial temperature")
+    parser.add_argument("--t-final", type=float, default=0.05, help="Final temperature")
+    parser.add_argument("--min-keep-score", type=int, default=37, help="Minimum score floor for model writes")
+    parser.add_argument("--n-perturb", type=int, default=15, help="Features perturbed per step")
+    parser.add_argument("--restart-every", type=int, default=400, help="Restart from best every N iterations")
     args = parser.parse_args()
 
     repo = Path(__file__).resolve().parents[1]
     model_path = repo / "solution" / "model_params.json"
-    elite_dir = repo / "solution" / "elites"
     model = json.loads(model_path.read_text(encoding="utf-8"))
 
     if "feature_weights" not in model:
@@ -209,88 +217,110 @@ def main():
         if i is not None:
             base[i] = float(v)
 
-    best_w = list(base)
-    best = evaluate_exact(data, best_w)
-    print(json.dumps({"start_passed": best, "total": 100, "feature_count": len(names)}))
-
     tunable = [i for i, n in enumerate(names) if tunable_feature(n)]
-    targeted = [i for i, n in enumerate(names) if n.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::"))]
+    # High-impact families for targeted perturbation
+    high_impact = [i for i, n in enumerate(names) if n.startswith((
+        "last_stop_bin::", "last_stint_bin::", "final_tire_track::",
+        "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::",
+        "temp_final_tire::", "track_temp_stop::", "driver_track::",
+        "late::", "late_temp::", "last_stint_tire::",
+    ))]
+    high_impact_set = set(high_impact)
 
-    if args.top_impact_k and args.top_impact_k > 0:
-        def impact_score(i):
-            name = names[i]
-            base_abs = abs(base[i])
-            # Prioritize currently strong coefficients and late-phase targeted families.
-            fam_boost = 1.0
-            if name.startswith(("last_stop_bin::", "last_stint_bin::", "final_tire_track::", "final_tire_stopbin::", "track_last_stop::", "temp_last_stop::", "temp_final_tire::", "track_temp_stop::", "late::", "late_temp::")):
-                fam_boost = 1.6
-            return base_abs * fam_boost
-
-        ranked = sorted(tunable, key=impact_score, reverse=True)
-        k = min(len(ranked), int(args.top_impact_k))
-        tunable = ranked[:k]
-        targeted = [i for i in targeted if i in set(tunable)]
     rng = random.Random(args.seed)
+    iterations = args.iterations
 
-    iterations = int(args.iterations)
+    best_w = list(base)
+    best_score = evaluate_exact(data, best_w)
+    current_w = list(best_w)
+    current_score = best_score
+
+    floor = args.min_keep_score
+    print(json.dumps({"start_passed": best_score, "total": 100, "feature_count": len(names),
+                      "tunable": len(tunable), "floor": floor}))
+
+    accepts = 0
+    declines = 0
+    improvements = 0
+
     for t in range(1, iterations + 1):
-        cand = list(best_w)
-        k = rng.randint(8, 26)
-        picks = rng.sample(tunable, k=min(k, len(tunable)))
-        if targeted:
-            bonus_k = min(len(targeted), rng.randint(3, 8))
-            picks.extend(rng.sample(targeted, k=bonus_k))
-            picks = list(dict.fromkeys(picks))
+        # Temperature: exponential decay
+        frac = t / iterations
+        temp = args.t0 * math.exp(-frac * math.log(args.t0 / max(args.t_final, 1e-9)))
 
-        step_mul = 0.10 if t < 120 else (0.06 if t < 240 else 0.03)
-        step_add = 0.015 if t < 120 else (0.008 if t < 240 else 0.004)
+        # Occasionally restart from best to exploit best known
+        if args.restart_every > 0 and t % args.restart_every == 0:
+            current_w = list(best_w)
+            current_score = best_score
 
-        for i in picks:
-            scale = 1.0 + rng.uniform(-step_mul, step_mul)
-            cand[i] *= scale
-            add = rng.uniform(-step_add, step_add)
-            if i in targeted:
-                add *= 2.0
-            cand[i] += add
+        # Build candidate
+        cand = list(current_w)
+        # More high-impact features early
+        n_pick = args.n_perturb
+        n_hi = min(len(high_impact), max(3, n_pick // 2))
+        hi_picks = rng.sample(high_impact, k=n_hi)
+        lo_picks = rng.sample(tunable, k=min(n_pick - n_hi, len(tunable)))
+        picks = list(dict.fromkeys(hi_picks + lo_picks))
 
-        score = evaluate_exact(data, cand)
-        if score >= best:
-            # Keep equal-scoring alternatives occasionally to escape local plateaus.
-            if score > best or rng.random() < 0.2:
-                best_w = cand
-                if score > best:
-                    best = score
-                    print(json.dumps({"iter": t, "passed": best, "total": 100}))
-                    if args.save_elites:
-                        elite_dir.mkdir(parents=True, exist_ok=True)
-                        elite_model = deepcopy(model)
-                        elite_fw = deepcopy(fw)
-                        for n, ii in idx.items():
-                            if abs(best_w[ii]) > 1e-12:
-                                elite_fw[n] = float(best_w[ii])
-                        elite_model["feature_weights"] = elite_fw
-                        elite_meta = elite_model.setdefault("metadata", {})
-                        elite_meta["elite_saved_from"] = "phase4_hillclimb_visible"
-                        elite_meta["elite_passed"] = best
-                        elite_meta["elite_iter"] = t
-                        elite_meta["elite_seed"] = args.seed
-                        elite_name = f"model_params_visible_best_{best:02d}_seed_{args.seed}_iter_{t}.json"
-                        (elite_dir / elite_name).write_text(json.dumps(elite_model, indent=2), encoding="utf-8")
+        # Step scale decreases as temperature drops
+        step_mul = max(0.02, min(0.25, temp * 0.12))
+        step_add = max(0.003, min(0.03, temp * 0.015))
 
-    if best > evaluate_exact(data, base):
+        for idx_f in picks:
+            cur = cand[idx_f]
+            if abs(cur) > 1e-9:
+                scale = 1.0 + rng.uniform(-step_mul, step_mul)
+                cand[idx_f] = cur * scale + rng.uniform(-step_add, step_add)
+            else:
+                cand[idx_f] = rng.uniform(-step_add * 2, step_add * 2)
+
+        cand_score = evaluate_exact(data, cand)
+        delta = cand_score - current_score
+
+        # SA acceptance criterion
+        if delta > 0:
+            # Always accept improvement
+            current_w = cand
+            current_score = cand_score
+            improvements += 1
+            if current_score > best_score:
+                best_score = current_score
+                best_w = list(current_w)
+                print(json.dumps({"iter": t, "new_best": best_score, "temp": round(temp, 4)}))
+        elif delta == 0:
+            # Accept neutral moves freely
+            current_w = cand
+            accepts += 1
+        else:
+            # Accept degradation with SA probability
+            accept_prob = math.exp(delta / max(temp, 1e-9))
+            if rng.random() < accept_prob:
+                current_w = cand
+                current_score = cand_score
+                declines += 1
+
+    print(json.dumps({
+        "final_best": best_score,
+        "improvements": improvements,
+        "accepted_declines": declines,
+        "total_iterations": iterations,
+    }))
+
+    # Write to model if improvement
+    if best_score > evaluate_exact(data, base) and best_score >= floor:
         new_fw = deepcopy(fw)
         for n, i in idx.items():
             if abs(best_w[i]) > 1e-12:
                 new_fw[n] = float(best_w[i])
         model["feature_weights"] = new_fw
         meta = model.setdefault("metadata", {})
-        meta["phase4_hillclimb_visible"] = True
-        meta["phase4_hillclimb_best"] = best
-        meta["phase4_hillclimb_seed"] = args.seed
-        meta["phase4_hillclimb_iterations"] = iterations
+        meta["phase9_sa_best"] = best_score
+        meta["phase9_sa_seed"] = args.seed
+        meta["phase9_sa_iterations"] = iterations
         model_path.write_text(json.dumps(model, indent=2), encoding="utf-8")
-
-    print(json.dumps({"final_passed": best, "total": 100}))
+        print(json.dumps({"saved": True, "score": best_score}))
+    else:
+        print(json.dumps({"saved": False, "start": evaluate_exact(data, base), "best": best_score}))
 
 
 if __name__ == "__main__":
